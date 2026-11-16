@@ -144,6 +144,40 @@ object Dialogs {
         }
         paintModes()
         col.addView(ui.text("عند اختيار «قبل المناسبة بيوم» يعرض الودجت مناسبة اليوم ومناسبة الليلة (مناسبة الغد).", 12f, Colors.MUTED).apply { setPadding(0, ui.dp(4), 0, 0) })
+        // Next religious occasion and when its reminder will arrive, plus a test button.
+        val nextInfo = ui.text("", 14f, Colors.TEXT, bold = true).apply {
+            setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
+            background = ui.rounded(Colors.SOFT, 14)
+        }
+        fun nextOccasion(): Day? {
+            val today = java.time.LocalDate.now()
+            return CalendarData.days(activity).firstOrNull { it.greg.isAfter(today) && Notifier.isReligious(it) }
+        }
+        fun paintNext() {
+            val d = nextOccasion()
+            nextInfo.text = if (d == null) "لا توجد مناسبات دينية قادمة في هذه السنة" else {
+                val icon = if (d.isSorrow) "🏴" else "🌸"
+                val whenText = when (Prefs.occasionMode(activity)) {
+                    Prefs.OCC_BEFORE -> { val e = d.greg.minusDays(1); "${CalendarData.WEEKDAYS[e.dayOfWeek.value]} ${e.dayOfMonth}/${e.monthValue} الساعة ٧ مساءً" }
+                    Prefs.OCC_SAME -> "${CalendarData.weekday(d)} ${d.greg.dayOfMonth}/${d.greg.monthValue} الساعة ٧ صباحاً"
+                    else -> "التذكير متوقف"
+                }
+                "المناسبة القادمة: $icon ${d.occasions.first().text}\n${CalendarData.weekday(d)} ${CalendarData.hijriLabel(d)}\n⏰ موعد التذكير: $whenText"
+            }
+        }
+        paintNext()
+        modeViews.forEach { (id, v) ->
+            v.setOnClickListener { Prefs.setOccasionMode(activity, id); paintModes(); paintNext(); AlarmScheduler.scheduleNext(activity); ZahraWidget.updateAll(activity) }
+        }
+        col.addView(nextInfo, ui.match(0, 8, 0, 4))
+        col.addView(ui.outlineButton("🔔 تجربة إشعار المناسبة الآن") {
+            val d = nextOccasion()
+            if (d == null) Toast.makeText(activity, "لا توجد مناسبة قادمة للتجربة", Toast.LENGTH_SHORT).show()
+            else {
+                Notifier.showOccasion(activity, d, eve = Prefs.occasionMode(activity) != Prefs.OCC_SAME)
+                Toast.makeText(activity, "تم إرسال إشعار تجريبي — انظر شريط الإشعارات", Toast.LENGTH_SHORT).show()
+            }
+        })
         col.addView(ui.text("🔊 صوت الأذان (الصبح والظهر والمغرب)", 16f, ui.ink, bold = true), ui.match(0, 14, 0, 4))
         val rows = ArrayList<Pair<String, android.widget.TextView>>()
         fun paint() = rows.forEach { (id, v) ->

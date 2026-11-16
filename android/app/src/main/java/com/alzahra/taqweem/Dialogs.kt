@@ -42,7 +42,7 @@ object Dialogs {
         dialog.setContentView(ui.scroll(col))
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.setLayout((activity.resources.displayMetrics.widthPixels * 0.94).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
+        dialog.showImmersive()
         return dialog
     }
 
@@ -270,7 +270,7 @@ object Dialogs {
             setOnClickListener { dialog.dismiss() }
         }, FrameLayout.LayoutParams(ui.dp(48), ui.dp(48), Gravity.TOP or Gravity.START).apply { setMargins(ui.dp(12), ui.dp(12), 0, 0) })
         dialog.setContentView(box)
-        dialog.show()
+        dialog.showImmersive()
     }
 
     // ---------- التواصل ----------

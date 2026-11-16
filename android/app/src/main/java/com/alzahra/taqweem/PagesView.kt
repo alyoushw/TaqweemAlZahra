@@ -38,11 +38,24 @@ body{margin:0;padding:8px;background:#F5EFE6;font-family:sans-serif}
 .t{font-weight:bold;font-size:15px}
 .n{background:$a;color:#3a2a00;border-radius:8px;padding:5px 9px;font-weight:bold;font-size:13px;white-space:nowrap}
 img{display:block;width:100%;height:auto;min-height:120px;background:#eee}
-</style></head><body>$cards</body></html>"""
+</style></head><body>$cards
+<script>
+var last=0;
+function visible(){var c=document.querySelectorAll('.card'),mid=window.innerHeight*0.35,best=1;
+ for(var i=0;i<c.length;i++){if(c[i].getBoundingClientRect().top<=mid)best=parseInt(c[i].id.substring(1));}
+ if(best!==last){last=best;if(window.Z)Z.page(best);}}
+window.addEventListener('scroll',function(){window.requestAnimationFrame(visible);},{passive:true});
+</script></body></html>"""
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    fun all(ctx: Context, startPage: Int, onScale: (Int) -> Unit): WebView = web(ctx, 1..13, onScale, startPage)
+    fun all(ctx: Context, startPage: Int, onScale: (Int) -> Unit, onPage: (Int) -> Unit): WebView =
+        web(ctx, 1..13, onScale, startPage).apply {
+            addJavascriptInterface(object {
+                @android.webkit.JavascriptInterface
+                fun page(p: Int) { post { onPage(p) } }
+            }, "Z")
+        }
 
     fun zoomableWeb(ctx: Context, index: Int): WebView = web(ctx, index..index, {})
 
@@ -73,6 +86,6 @@ img{display:block;width:100%;height:auto;min-height:120px;background:#eee}
     }
 
     fun scrollTo(web: WebView, page: Int) {
-        web.evaluateJavascript("document.getElementById('p$page').scrollIntoView();", null)
+        web.evaluateJavascript("last=$page;document.getElementById('p$page').scrollIntoView();", null)
     }
 }

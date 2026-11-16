@@ -40,6 +40,8 @@ class MainActivity : Activity() {
     private var month = 1
     private var zoom = 1f
     private var pagesWeb: WebView? = null
+    private var tableWeb: WebView? = null
+    private var pagesBar: MonthBar? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,8 +50,6 @@ class MainActivity : Activity() {
         month = savedInstanceState?.getInt("month") ?: CalendarData.currentMonth(this)
         tab = savedInstanceState?.getInt("tab") ?: 0
         zoom = savedInstanceState?.getFloat("zoom") ?: 1f
-        window.statusBarColor = ui.theme.primaryDark
-        window.navigationBarColor = ui.theme.primaryDark
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -60,6 +60,7 @@ class MainActivity : Activity() {
         content = FrameLayout(this)
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
+        Immersive.apply(window)
         selectTab(tab)
 
         if (savedInstanceState == null) {
@@ -69,6 +70,11 @@ class MainActivity : Activity() {
         AlarmScheduler.scheduleNext(this)
         ZahraWidget.updateAll(this)
         handleIntent(intent)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) Immersive.apply(window)
     }
 
     override fun onSaveInstanceState(out: Bundle) {
@@ -177,6 +183,7 @@ class MainActivity : Activity() {
         }
         content.removeAllViews()
         pagesWeb = null
+        tableWeb = null
         content.addView(
             when (i) {
                 0 -> tableTab()
@@ -187,39 +194,67 @@ class MainActivity : Activity() {
     }
 
     private fun goToday() {
-        month = CalendarData.currentMonth(this)
-        if (tab == 2) pagesWeb?.let { PagesView.scrollTo(it, month) } else selectTab(0)
+        val now = CalendarData.currentMonth(this)
+        when {
+            tab == 2 -> pagesWeb?.let { PagesView.scrollTo(it, now); pagesBar?.select(now) }
+            tab == 0 && month == now && tableWeb != null -> tableWeb?.let { w -> w.evaluateJavascript("goToday()") { TableWeb.toRightEdge(w) } }
+            else -> { month = now; selectTab(0) }
+        }
     }
 
     // ================= tab 1: the PDF-like table =================
 
-    private fun monthChips(selected: Int, includeNotes: Boolean, onPick: (Int) -> Unit): View {
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setPadding(ui.dp(6), ui.dp(10), ui.dp(6), ui.dp(10))
+    /** Month chips; [select] re-highlights a month (and scrolls it into view) without rebuilding. */
+    private inner class MonthBar(selected: Int, includeNotes: Boolean, onPick: (Int) -> Unit) {
+        val chips = ArrayList<TextView>()
+        val view: HorizontalScrollView
+        private var current = selected
+
+        init {
+            val bar = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(ui.dp(6), ui.dp(10), ui.dp(6), ui.dp(10))
+            }
+            CalendarData.MONTHS.forEachIndexed { i, name ->
+                val c = ui.chip(name, i + 1 == selected) { onPick(i + 1) }
+                chips += c
+                bar.addView(c)
+            }
+            if (includeNotes) bar.addView(ui.chip("ⓘ التنبيهات", false) { onPick(13) })
+            view = HorizontalScrollView(this@MainActivity).apply {
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                isHorizontalScrollBarEnabled = false
+                setBackgroundColor(Color.parseColor("#F1E9DC"))
+                addView(bar)
+            }
+            view.post { center(selected, false) }
         }
-        var selectedView: View? = null
-        CalendarData.MONTHS.forEachIndexed { i, name ->
-            val c = ui.chip(name, i + 1 == selected) { onPick(i + 1) }
-            if (i + 1 == selected) selectedView = c
-            bar.addView(c)
+
+        fun select(m: Int) {
+            if (m !in 1..12 || m == current) return
+            current = m
+            chips.forEachIndexed { i, c ->
+                val sel = i + 1 == m
+                c.setTextColor(if (sel) Color.WHITE else Colors.TEXT)
+                c.typeface = if (sel) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                c.background = if (sel) ui.rounded(ui.theme.primary, 14) else ui.rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
+            }
+            center(m, true)
         }
-        if (includeNotes) bar.addView(ui.chip("ⓘ التنبيهات", false) { onPick(13) })
-        return HorizontalScrollView(this).apply {
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            isHorizontalScrollBarEnabled = false
-            setBackgroundColor(Color.parseColor("#F1E9DC"))
-            addView(bar)
-            post { selectedView?.let { v -> smoothScrollTo((v.left - width / 2 + v.width / 2).coerceAtLeast(0), 0) } }
+
+        private fun center(m: Int, smooth: Boolean) {
+            val v = chips.getOrNull(m - 1) ?: return
+            val x = (v.left - view.width / 2 + v.width / 2).coerceAtLeast(0)
+            if (smooth) view.smoothScrollTo(x, 0) else view.scrollTo(x, 0)
         }
     }
 
     private fun tableTab(): View {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-        col.addView(monthChips(month, true) { m ->
+        col.addView(MonthBar(month, true) { m ->
             if (m == 13) Dialogs.page(this, 13) else { month = m; selectTab(0) }
-        })
+        }.view)
 
         // Toolbar
         val tools = ui.row().apply { setPadding(ui.dp(8), ui.dp(4), ui.dp(8), ui.dp(8)) }
@@ -238,9 +273,9 @@ class MainActivity : Activity() {
         tools.addView(icon("🎨", 20f) { Dialogs.theme(this) { recreate() } })
         tools.addView(icon("🔔", 20f) { Dialogs.notifications(this) })
         tools.addView(icon("▦", 22f, Color.parseColor("#C9A227")) { Dialogs.widgetSettings(this) })
-        tools.addView(icon("＋", 22f, p) { zoom = (zoom + 0.15f).coerceAtMost(1.8f); selectTab(0) })
-        tools.addView(icon("－", 22f, p) { zoom = (zoom - 0.15f).coerceAtLeast(0.6f); selectTab(0) })
-        tools.addView(icon("⟳", 22f, p) { zoom = 1f; selectTab(0) })
+        tools.addView(icon("＋", 22f, p) { tableWeb?.zoomIn() })
+        tools.addView(icon("－", 22f, p) { tableWeb?.zoomOut() })
+        tools.addView(icon("⟳", 22f, p) { selectTab(0) })
         col.addView(HorizontalScrollView(this).apply {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             isHorizontalScrollBarEnabled = false
@@ -263,30 +298,10 @@ class MainActivity : Activity() {
         box("شهر ${CalendarData.MONTHS[month - 1]} ${CalendarData.ar(CalendarData.YEAR)} هـ", Color.parseColor("#F5EFE3"), ui.theme.primary, 1f)
         col.addView(banner, ui.match(8, 0, 8, 6))
 
-        // Column titles stay fixed above the scrolling rows and follow the sideways scroll.
-        val built = MonthTable(ui) { d -> Dialogs.day(this, d) }.build(month, zoom)
-        val headScroll = object : HorizontalScrollView(this) {
-            override fun onTouchEvent(ev: android.view.MotionEvent?) = false
-            override fun onInterceptTouchEvent(ev: android.view.MotionEvent?) = false
-        }.apply {
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            isHorizontalScrollBarEnabled = false
-            addView(built.header)
-        }
-        val bodyScroll = HorizontalScrollView(this).apply {
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            addView(built.body)
-            setOnScrollChangeListener { _, x, _, _, _ -> headScroll.scrollTo(x, 0) }
-        }
-        col.addView(headScroll, ui.match(6, 0, 6, 0))
-        val sv = ScrollView(this).apply {
-            isFillViewport = true
-            addView(bodyScroll)
-            setPadding(ui.dp(6), 0, ui.dp(6), ui.dp(6))
-            clipToPadding = false
-        }
-        if (built.todayOffset >= 0) sv.post { sv.scrollTo(0, (built.todayOffset - ui.dp(100)).coerceAtLeast(0)) }
-        col.addView(sv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        // The table itself: pinch with two fingers to zoom, drag to move in any direction.
+        val web = TableWeb.create(this, month) {}
+        tableWeb = web
+        col.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         return col
     }
 
@@ -415,20 +430,28 @@ class MainActivity : Activity() {
             setPadding(ui.dp(14), ui.dp(6), ui.dp(14), ui.dp(6))
             background = ui.rounded(ui.theme.accent, 16)
         }
-        val web = PagesView.all(this, month) { pct -> zoomLabel.text = "$pct%" }
+        lateinit var bar: MonthBar
+        val web = PagesView.all(this, month, { pct -> zoomLabel.text = "$pct%" }) { visible ->
+            if (visible in 1..12) { month = visible; bar.select(visible) }
+        }
         pagesWeb = web
-        box.addView(monthChips(month, true) { m -> month = if (m == 13) month else m; PagesView.scrollTo(web, m) })
+        bar = MonthBar(month, true) { m ->
+            if (m in 1..12) { month = m; bar.select(m) }
+            PagesView.scrollTo(web, m)
+        }
+        pagesBar = bar
+        box.addView(bar.view)
 
         val frame = FrameLayout(this)
         frame.addView(web)
-        val bar = ui.row().apply {
+        val zbar = ui.row().apply {
             background = ui.rounded(Color.parseColor("#E61E1E1E"), 30, ui.theme.accent, 1)
             setPadding(ui.dp(10), ui.dp(6), ui.dp(10), ui.dp(6))
         }
-        bar.addView(icon("🔍+", 18f) { web.zoomIn() })
-        bar.addView(zoomLabel, ui.wrap(6, 0, 6, 0))
-        bar.addView(icon("🔍−", 18f) { web.zoomOut() })
-        frame.addView(bar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = ui.dp(16) })
+        zbar.addView(icon("🔍+", 18f) { web.zoomIn() })
+        zbar.addView(zoomLabel, ui.wrap(6, 0, 6, 0))
+        zbar.addView(icon("🔍−", 18f) { web.zoomOut() })
+        frame.addView(zbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = ui.dp(16) })
         box.addView(frame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         return box
     }

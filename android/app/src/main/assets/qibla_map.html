@@ -1,0 +1,40 @@
+<!doctype html><html dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="leaflet/leaflet.css">
+<style>
+html,body,#map{margin:0;height:100%;background:#1b1b1b}
+.kaaba{width:34px;height:34px;border-radius:50%;background:#111;border:3px solid #D4A92F;box-shadow:0 2px 8px #0008;position:relative}
+.kaaba:after{content:'';position:absolute;left:7px;right:7px;top:12px;height:4px;background:#D4A92F}
+.me{width:20px;height:20px;border-radius:50%;background:#1E88E5;border:4px solid #fff;box-shadow:0 0 0 2px #1E88E5aa,0 2px 8px #0008}
+.leaflet-control-attribution{font-size:9px}
+</style></head><body><div id="map"></div>
+<script src="leaflet/leaflet.js"></script>
+<script>
+var KAABA=[21.4224779,39.8251832];
+var map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:20}).setView(KAABA,17);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Esri, Maxar'}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,opacity:.9}).addTo(map);
+L.marker(KAABA,{icon:L.divIcon({className:'',html:'<div class="kaaba"></div>',iconSize:[34,34],iconAnchor:[17,17]})}).addTo(map);
+var me=null,acc=null,line=null,cone=null,pos=null;
+function rad(d){return d*Math.PI/180}function deg(r){return r*180/Math.PI}
+// Great-circle (shortest path) points from a to b, as Google's Qibla Finder does.
+function gc(a,b,n){var la1=rad(a[0]),lo1=rad(a[1]),la2=rad(b[0]),lo2=rad(b[1]);
+ var d=2*Math.asin(Math.sqrt(Math.pow(Math.sin((la2-la1)/2),2)+Math.cos(la1)*Math.cos(la2)*Math.pow(Math.sin((lo2-lo1)/2),2)));var p=[];
+ for(var i=0;i<=n;i++){var f=i/n,A=Math.sin((1-f)*d)/Math.sin(d),B=Math.sin(f*d)/Math.sin(d);
+  var x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2),y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2),z=A*Math.sin(la1)+B*Math.sin(la2);
+  p.push([deg(Math.atan2(z,Math.sqrt(x*x+y*y))),deg(Math.atan2(y,x))]);}return p;}
+// Dense near the user so the line is exact over their building.
+function path(a){var near=gc(a,KAABA,4000).slice(0,60);return near.concat(gc(a,KAABA,200));}
+function setMe(lat,lon,accuracy,first){pos=[lat,lon];
+ if(!me){me=L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[20,20],iconAnchor:[10,10]}),zIndexOffset:1000}).addTo(map);
+  acc=L.circle(pos,{radius:accuracy,color:'#1E88E5',weight:1,fillOpacity:.12}).addTo(map);}
+ else{me.setLatLng(pos);acc.setLatLng(pos).setRadius(accuracy);}
+ if(line)map.removeLayer(line);
+ line=L.polyline(path(pos),{color:'#FFD54F',weight:5,opacity:.95,dashArray:'1 10',lineCap:'round'}).addTo(map);
+ if(first)map.setView(pos,19);}
+function heading(h){if(!pos)return;var r=0.00025,pts=[pos];for(var a=h-25;a<=h+25;a+=5){pts.push([pos[0]+r*Math.cos(rad(a)),pos[1]+r*Math.sin(rad(a))/Math.cos(rad(pos[0]))]);}
+ if(cone)cone.setLatLngs(pts);else cone=L.polygon(pts,{color:'#1E88E5',weight:0,fillOpacity:.3}).addTo(map);}
+function goMe(){if(pos)map.setView(pos,19);}
+function goKaaba(){map.setView(KAABA,18);}
+function overview(){if(pos)map.fitBounds(L.latLngBounds([pos,KAABA]),{padding:[40,40]});}
+</script></body></html>

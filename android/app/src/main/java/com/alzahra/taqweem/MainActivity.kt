@@ -123,6 +123,11 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 21) Qibla.onPermissionResult()
+    }
+
     private fun askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 10)
@@ -243,7 +248,7 @@ class MainActivity : Activity() {
             row("▦", "ودجت الشاشة الرئيسية", "المقاس والألوان والمحتوى") { Dialogs.widgetSettings(this) }
             group("الصلاة")
             row("🔔", "الإشعارات والأذان", "تنبيهات الصلاة ومناسبة اليوم") { Dialogs.notifications(this) }
-            row("🧭", "اتجاه القبلة", "بوصلة القبلة من الأحساء") { Qibla.show(this) }
+            row("🧭", "اتجاه القبلة", "البوصلة وخريطة الأقمار الصناعية") { Qibla.show(this) }
             row("⚠", "تنبيه السيستاني", "الاحتياط في الإمساك وصلاة الصبح") { Dialogs.sistani(this) }
             row("📄", "صفحة التنبيهات والإرشادات", "شرح رموز وألوان التقويم") { Dialogs.page(this, 13) }
             group("التطبيق")

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
@@ -20,13 +21,19 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 
+/**
+ * Three tabs:
+ *  0  تقويم الزهراء المرفق — month bar + the zoomable month table (main screen)
+ *  1  التقويم التفاعلي     — today, duas, and the month's occasions log
+ *  2  التقويم الكامل       — the scanned pages
+ * Everything else (theme, widget, notifications, qibla, updates, contact) lives behind ⚙ الإعدادات.
+ */
 class MainActivity : Activity() {
 
     private lateinit var ui: Ui
@@ -35,13 +42,15 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var ticker: Runnable? = null
     private var player: MediaPlayer? = null
+    private var updateBanner: TextView? = null
 
     private var tab = 0
     private var month = 1
-    private var zoom = 1f
     private var pagesWeb: WebView? = null
     private var tableWeb: WebView? = null
     private var pagesBar: MonthBar? = null
+
+    // ================= lifecycle =================
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,7 +58,6 @@ class MainActivity : Activity() {
         Notifier.ensureChannels(this)
         month = savedInstanceState?.getInt("month") ?: CalendarData.currentMonth(this)
         tab = savedInstanceState?.getInt("tab") ?: 0
-        zoom = savedInstanceState?.getFloat("zoom") ?: 1f
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,9 +78,7 @@ class MainActivity : Activity() {
         Immersive.apply(window)
         selectTab(tab)
 
-        if (savedInstanceState == null) {
-            askNotificationPermission()
-        }
+        if (savedInstanceState == null) askNotificationPermission()
         AlarmScheduler.scheduleNext(this)
         ZahraWidget.updateAll(this)
         handleIntent(intent)
@@ -87,7 +93,6 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(out)
         out.putInt("month", month)
         out.putInt("tab", tab)
-        out.putFloat("zoom", zoom)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -99,16 +104,6 @@ class MainActivity : Activity() {
         if (i?.action == ZahraWidget.ACTION_WIDGET_SETTINGS) {
             i.action = null
             content.post { Dialogs.widgetSettings(this) }
-        }
-    }
-
-    private var updateBanner: TextView? = null
-
-    private fun showUpdateBanner(rel: Updater.Release) {
-        updateBanner?.apply {
-            text = "🔔 تحديث جديد متوفر (${rel.name}) — اضغط هنا للتحديث"
-            visibility = View.VISIBLE
-            setOnClickListener { Updater.install(this@MainActivity, rel) }
         }
     }
 
@@ -134,6 +129,14 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showUpdateBanner(rel: Updater.Release) {
+        updateBanner?.apply {
+            text = "🔔 تحديث جديد متوفر (${rel.name}) — اضغط هنا للتحديث"
+            visibility = View.VISIBLE
+            setOnClickListener { Updater.install(this@MainActivity, rel) }
+        }
+    }
+
     // ================= header + tabs =================
 
     private fun header(): View {
@@ -142,52 +145,47 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             setBackgroundColor(t.primary)
-            setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
+            setPadding(ui.dp(16), ui.dp(14), ui.dp(16), ui.dp(12))
         }
         val r1 = ui.row()
-        r1.addView(ui.text("تقويم الزهراء - الأحساء", 22f, t.accent, bold = true), ui.weight())
-        r1.addView(icon("🧭", 22f) { Qibla.show(this) })
-        r1.addView(icon("🎨", 22f) { Dialogs.theme(this) { recreate() } })
-        r1.addView(icon("▦", 24f, t.accent) { Dialogs.widgetSettings(this) })
-        box.addView(r1)
-
-        val r2 = ui.row()
-        r2.addView(ui.text("للتواصل والدعم", 14f, Color.parseColor("#E6FFFFFF")).apply {
-            setPadding(0, ui.dp(4), ui.dp(8), ui.dp(4))
-            setOnClickListener { Dialogs.contact(this@MainActivity) }
-        }, ui.weight())
+        val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        titles.addView(ui.text("تقويم الزهراء - الأحساء", 21f, t.accent, bold = true))
         val today = CalendarData.byDate(this, LocalDate.now())
-        val pill = if (today != null) "اليوم: ${today.zahra} ${CalendarData.MONTHS[today.month - 1]} (${CalendarData.weekday(today)})" else "تقويم ١٤٤٨هـ"
-        r2.addView(ui.text(pill, 14f, Color.parseColor("#2A1A00"), bold = true).apply {
-            setPadding(ui.dp(12), ui.dp(7), ui.dp(12), ui.dp(7))
-            background = ui.rounded(t.accent, 12)
+        val sub = if (today != null) "${CalendarData.weekday(today)} • ${today.zahra} ${CalendarData.MONTHS[today.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ" else "١٤٤٨هـ"
+        titles.addView(ui.text(sub, 14f, Color.parseColor("#E6FFFFFF")).apply {
+            setPadding(0, ui.dp(2), 0, 0)
             setOnClickListener { goToday() }
         })
-        box.addView(r2, ui.match(0, 4, 0, 10))
+        r1.addView(titles, ui.weight())
+        r1.addView(ui.text("اليوم", 14f, Color.parseColor("#2A1A00"), bold = true).apply {
+            setPadding(ui.dp(14), ui.dp(7), ui.dp(14), ui.dp(7))
+            background = ui.rounded(t.accent, 12)
+            setOnClickListener { goToday() }
+        }, ui.wrap(0, 0, 8, 0))
+        r1.addView(ui.text("⚙", 24f, Color.WHITE, bold = true).apply {
+            gravity = Gravity.CENTER
+            background = ui.rounded(Color.parseColor("#33FFFFFF"), 12)
+            setOnClickListener { settings() }
+        }, LinearLayout.LayoutParams(ui.dp(42), ui.dp(42)))
+        box.addView(r1)
 
         val tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            background = ui.rounded(t.primaryDark, 16, t.accent, 1)
+            background = ui.rounded(t.primaryDark, 14)
             setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4))
         }
         listOf("تقويم الزهراء المرفق", "التقويم التفاعلي", "التقويم الكامل").forEachIndexed { i, label ->
             val v = ui.text(label, 14f, Color.WHITE, bold = true).apply {
                 gravity = Gravity.CENTER
-                setPadding(ui.dp(4), ui.dp(12), ui.dp(4), ui.dp(12))
+                setPadding(ui.dp(2), ui.dp(10), ui.dp(2), ui.dp(10))
                 setOnClickListener { selectTab(i) }
             }
             tabViews += v
             tabs.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        box.addView(tabs)
+        box.addView(tabs, ui.match(0, 12, 0, 0))
         return box
-    }
-
-    private fun icon(glyph: String, size: Float, color: Int = Color.WHITE, onClick: () -> Unit) = ui.text(glyph, size, color, bold = true).apply {
-        gravity = Gravity.CENTER
-        setPadding(ui.dp(8), ui.dp(4), ui.dp(8), ui.dp(4))
-        setOnClickListener { onClick() }
     }
 
     private fun selectTab(i: Int) {
@@ -195,12 +193,13 @@ class MainActivity : Activity() {
         stopTicker()
         player?.release(); player = null
         tabViews.forEachIndexed { j, v ->
-            v.background = if (j == i) ui.rounded(ui.theme.accent, 12) else null
-            v.setTextColor(if (j == i) Color.parseColor("#2A1A00") else Color.WHITE)
+            v.background = if (j == i) ui.rounded(ui.theme.accent, 11) else null
+            v.setTextColor(if (j == i) Color.parseColor("#2A1A00") else Color.parseColor("#D9FFFFFF"))
         }
         content.removeAllViews()
         pagesWeb = null
         tableWeb = null
+        pagesBar = null
         content.addView(
             when (i) {
                 0 -> tableTab()
@@ -215,14 +214,56 @@ class MainActivity : Activity() {
         when {
             tab == 2 -> pagesWeb?.let { PagesView.scrollTo(it, now); pagesBar?.select(now) }
             tab == 0 && month == now && tableWeb != null -> tableWeb?.let { w -> w.evaluateJavascript("goToday()") { TableWeb.toRightEdge(w) } }
-            else -> { month = now; selectTab(0) }
+            else -> { month = now; selectTab(tab) }
         }
     }
 
-    // ================= tab 1: the PDF-like table =================
+    // ================= settings =================
+
+    private fun settings() {
+        Dialogs.sheet(this, "⚙", "الإعدادات", null) { col, dialog ->
+            fun row(icon: String, title: String, subtitle: String, action: () -> Unit) {
+                val r = ui.row().apply {
+                    setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14))
+                    background = ui.rounded(Color.WHITE, 16, Color.parseColor("#ECE3D3"), 1)
+                    setOnClickListener { dialog.dismiss(); action() }
+                }
+                r.addView(ui.text(icon, 22f, ui.theme.primary).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)))
+                val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, 0, 0) }
+                tx.addView(ui.text(title, 16f, Colors.TEXT, bold = true))
+                tx.addView(ui.text(subtitle, 12.5f, Colors.MUTED))
+                r.addView(tx, ui.weight())
+                r.addView(ui.text("‹", 26f, Colors.MUTED))
+                col.addView(r, ui.match(0, 4, 0, 4))
+            }
+            fun group(title: String) = col.addView(ui.text(title, 13f, Colors.MUTED, bold = true), ui.match(4, 12, 4, 2))
+
+            group("المظهر والشاشة الرئيسية")
+            row("🎨", "مظهر التطبيق", "اختيار اللون: ${ui.theme.title}") { Dialogs.theme(this) { recreate() } }
+            row("▦", "ودجت الشاشة الرئيسية", "المقاس والألوان والمحتوى") { Dialogs.widgetSettings(this) }
+            group("الصلاة")
+            row("🔔", "الإشعارات والأذان", "تنبيهات الصلاة ومناسبة اليوم") { Dialogs.notifications(this) }
+            row("🧭", "اتجاه القبلة", "بوصلة القبلة من الأحساء") { Qibla.show(this) }
+            row("⚠", "تنبيه السيستاني", "الاحتياط في الإمساك وصلاة الصبح") { Dialogs.sistani(this) }
+            row("📄", "صفحة التنبيهات والإرشادات", "شرح رموز وألوان التقويم") { Dialogs.page(this, 13) }
+            group("التطبيق")
+            row("⬆", "التحديثات", "الإصدار الحالي ${BuildConfig.VERSION_NAME} — اضغط للتحقق") {
+                Updater.check(this, manual = true) { showUpdateBanner(it) }
+            }
+            row("🔗", "مشاركة التطبيق", "إرسال رابط التحميل") {
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, "تطبيق تقويم الزهراء - الأحساء ١٤٤٨هـ\n${Updater.APK_URL}")
+                }, "مشاركة التطبيق"))
+            }
+            row("📞", "التواصل والدعم", Dialogs.CONTACT_NAME) { Dialogs.contact(this) }
+        }
+    }
+
+    // ================= month bar =================
 
     /** Month chips; [select] re-highlights a month (and scrolls it into view) without rebuilding. */
-    private inner class MonthBar(selected: Int, includeNotes: Boolean, onPick: (Int) -> Unit) {
+    private inner class MonthBar(selected: Int, onPick: (Int) -> Unit) {
         val chips = ArrayList<TextView>()
         val view: HorizontalScrollView
         private var current = selected
@@ -231,18 +272,16 @@ class MainActivity : Activity() {
             val bar = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
-                setPadding(ui.dp(6), ui.dp(10), ui.dp(6), ui.dp(10))
+                setPadding(ui.dp(8), ui.dp(10), ui.dp(8), ui.dp(10))
             }
             CalendarData.MONTHS.forEachIndexed { i, name ->
                 val c = ui.chip(name, i + 1 == selected) { onPick(i + 1) }
                 chips += c
                 bar.addView(c)
             }
-            if (includeNotes) bar.addView(ui.chip("ⓘ التنبيهات", false) { onPick(13) })
             view = HorizontalScrollView(this@MainActivity).apply {
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
                 isHorizontalScrollBarEnabled = false
-                setBackgroundColor(Color.parseColor("#F1E9DC"))
                 addView(bar)
             }
             view.post { center(selected, false) }
@@ -254,7 +293,7 @@ class MainActivity : Activity() {
             chips.forEachIndexed { i, c ->
                 val sel = i + 1 == m
                 c.setTextColor(if (sel) Color.WHITE else Colors.TEXT)
-                c.typeface = if (sel) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                c.typeface = if (sel) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
                 c.background = if (sel) ui.rounded(ui.theme.primary, 14) else ui.rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
             }
             center(m, true)
@@ -267,55 +306,12 @@ class MainActivity : Activity() {
         }
     }
 
+    // ================= tab 1: the table =================
+
     private fun tableTab(): View {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-        col.addView(MonthBar(month, true) { m ->
-            if (m == 13) Dialogs.page(this, 13) else { month = m; selectTab(0) }
-        }.view)
-
-        // Toolbar
-        val tools = ui.row().apply { setPadding(ui.dp(8), ui.dp(4), ui.dp(8), ui.dp(8)) }
-        tools.addView(ui.text("⚠ تنبيه السيستاني", 14f, Color.WHITE, bold = true).apply {
-            setPadding(ui.dp(12), ui.dp(9), ui.dp(12), ui.dp(9))
-            background = ui.rounded(Color.parseColor("#D32F2F"), 12)
-            setOnClickListener { Dialogs.sistani(this@MainActivity) }
-        }, ui.wrap(0, 0, 6, 0))
-        tools.addView(ui.text("📅 اليوم الحالي", 14f, Color.WHITE, bold = true).apply {
-            setPadding(ui.dp(12), ui.dp(9), ui.dp(12), ui.dp(9))
-            background = ui.rounded(ui.theme.primary, 12)
-            setOnClickListener { goToday() }
-        }, ui.wrap(0, 0, 6, 0))
-        val p = ui.theme.primary
-        tools.addView(icon("🧭", 20f) { Qibla.show(this) })
-        tools.addView(icon("🎨", 20f) { Dialogs.theme(this) { recreate() } })
-        tools.addView(icon("🔔", 20f) { Dialogs.notifications(this) })
-        tools.addView(icon("▦", 22f, Color.parseColor("#C9A227")) { Dialogs.widgetSettings(this) })
-        tools.addView(icon("＋", 22f, p) { tableWeb?.zoomIn() })
-        tools.addView(icon("－", 22f, p) { tableWeb?.zoomOut() })
-        tools.addView(icon("⟳", 22f, p) { selectTab(0) })
-        col.addView(HorizontalScrollView(this).apply {
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            isHorizontalScrollBarEnabled = false
-            addView(tools)
-        })
-
-        // Banner (as printed across the top of each page)
-        val banner = ui.row().apply {
-            setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4))
-            background = ui.rounded(Color.parseColor("#FFF8EA"), 12, ui.theme.accent, 2)
-        }
-        fun box(s: String, bg: Int, fg: Int, w: Float) = banner.addView(ui.text(s, 12.5f, fg, bold = true).apply {
-            gravity = Gravity.CENTER
-            maxLines = 1
-            setPadding(ui.dp(4), ui.dp(8), ui.dp(4), ui.dp(8))
-            background = ui.rounded(bg, 8, Color.parseColor("#D9CBB3"), 1)
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, w).apply { setMargins(ui.dp(3), 0, ui.dp(3), 0) })
-        box("سما العمران للسياحة • الأحساء", Color.parseColor("#F5EFE3"), ui.theme.primary, 1f)
-        box("تقويم الزهراء (سنة ٤١)", ui.theme.primary, ui.theme.accent, 1.1f)
-        box("شهر ${CalendarData.MONTHS[month - 1]} ${CalendarData.ar(CalendarData.YEAR)} هـ", Color.parseColor("#F5EFE3"), ui.theme.primary, 1f)
-        col.addView(banner, ui.match(8, 0, 8, 6))
-
-        // The table itself: pinch with two fingers to zoom, drag to move in any direction.
+        col.addView(MonthBar(month) { m -> month = m; selectTab(0) }.view)
+        // Pinch with two fingers to zoom; drag to move in any direction; tap a day for its details.
         val web = TableWeb.create(this, month) {}
         tableWeb = web
         col.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -325,100 +321,126 @@ class MainActivity : Activity() {
     // ================= tab 2: interactive =================
 
     private fun interactiveTab(): View {
-        val col = ui.column(12)
+        val col = ui.column(14)
         val day = CalendarData.byDate(this, LocalDate.now())
-        if (day != null) {
-            col.addView(ui.card().apply {
-                val r = ui.row()
-                val (bg, fg) = Colors.zahraCell(day.zahraColor)
-                r.addView(ui.text(CalendarData.ar(day.zahra), 30f, fg, bold = true).apply {
-                    gravity = Gravity.CENTER
-                    background = ui.rounded(if (bg == Color.TRANSPARENT) Color.parseColor("#F5EFE3") else bg, 12, Color.parseColor("#D9CBB3"), 1)
-                }, LinearLayout.LayoutParams(ui.dp(66), ui.dp(66)))
-                val info = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(14), 0, 0, 0) }
-                info.addView(ui.text(CalendarData.weekday(day), 15f, Colors.MUTED))
-                info.addView(ui.text(CalendarData.hijriLabel(day), 21f, ui.theme.primary, bold = true))
-                info.addView(ui.text("${CalendarData.gregLabel(day.greg)}م  •  أم القرى: ${CalendarData.ar(day.ummAlQura)}", 14f, Colors.MUTED))
-                r.addView(info, ui.weight())
-                addView(r)
-                setOnClickListener { Dialogs.day(this@MainActivity, day) }
-            })
 
-            val nextName = ui.text("", 16f, Color.WHITE, bold = true).apply { gravity = Gravity.CENTER }
-            val nextTimer = ui.text("--:--:--", 32f, ui.theme.accent, bold = true).apply { gravity = Gravity.CENTER }
-            col.addView(ui.card(ui.theme.primary, ui.theme.accent).apply { addView(nextName); addView(nextTimer) })
+        // Today
+        if (day != null) {
+            val card = ui.card(ui.theme.primary, ui.theme.primary).apply { setOnClickListener { Dialogs.day(this@MainActivity, day) } }
+            val r = ui.row()
+            r.addView(Dialogs.dayCircle(this, day, 58, onDark = true))
+            val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(14), 0, 0, 0) }
+            info.addView(ui.text("${CalendarData.weekday(day)} • ${CalendarData.gregLabel(day.greg)}م", 14f, Color.parseColor("#D9FFFFFF")))
+            info.addView(ui.text("${CalendarData.ar(day.zahra)} ${CalendarData.MONTHS[day.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ", 21f, Color.WHITE, bold = true))
+            r.addView(info, ui.weight())
+            card.addView(r)
+
+            val next = ui.text("", 15f, ui.theme.accent, bold = true).apply { setPadding(0, ui.dp(12), 0, ui.dp(8)) }
+            card.addView(next)
             startTicker {
-                val next = CalendarData.nextPrayer(this)
-                if (next != null) {
-                    val t = next.at.toLocalTime()
-                    val h = if (t.hour % 12 == 0) 12 else t.hour % 12
-                    nextName.text = "⏳ الوقت القادم: ${next.prayer.label} ($h:${"%02d".format(t.minute)})"
-                    val s = Duration.between(LocalDateTime.now(), next.at).seconds.coerceAtLeast(0)
-                    nextTimer.text = "%02d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
+                CalendarData.nextPrayer(this)?.let { n ->
+                    val s = Duration.between(LocalDateTime.now(), n.at).seconds.coerceAtLeast(0)
+                    next.text = "⏳ باقي على ${n.prayer.label}:  %02d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
                 }
             }
-
+            val strip = ui.row().apply { background = ui.rounded(Color.parseColor("#33000000"), 12); setPadding(0, ui.dp(8), 0, ui.dp(8)) }
+            listOf("الصبح" to day.times.fajr, "الشروق" to day.times.sunrise, "الظهر" to day.times.dhuhr, "المغرب" to day.times.maghrib, "المنتصف" to day.times.midnight).forEach { (l, v) ->
+                val c = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
+                c.addView(ui.text(l, 11.5f, Color.parseColor("#CCFFFFFF")).apply { gravity = Gravity.CENTER })
+                c.addView(ui.text(v, 16f, Color.WHITE, bold = true).apply { gravity = Gravity.CENTER })
+                strip.addView(c, ui.weight())
+            }
+            card.addView(strip)
             if (day.occasions.isNotEmpty()) {
-                val sb = SpannableStringBuilder()
-                day.occasions.forEachIndexed { i, o ->
-                    if (i > 0) sb.append("\n")
-                    val s = sb.length
-                    sb.append("• ").append(o.text)
-                    sb.setSpan(ForegroundColorSpan(Colors.occasion(o.color)), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                }
-                col.addView(ui.card().apply {
-                    addView(ui.title("مناسبة اليوم"))
-                    addView(ui.text(sb, 16f, Colors.TEXT, bold = true).apply { setLineSpacing(0f, 1.3f) })
+                card.addView(ui.text(day.occasions.joinToString("\n") { it.text }, 15f, Color.WHITE, bold = true).apply {
+                    setPadding(0, ui.dp(10), 0, 0); setLineSpacing(0f, 1.25f)
                 })
             }
-
-            col.addView(ui.card().apply {
-                addView(ui.title("مواقيت اليوم - الأحساء"))
-                val t = day.times
-                listOf(listOf("الإمساك" to t.imsak, "الصبح" to t.fajr, "الشروق" to t.sunrise), listOf("الظهر" to t.dhuhr, "المغرب" to t.maghrib, "منتصف الليل" to t.midnight)).forEach { chunk ->
-                    val r = ui.row()
-                    chunk.forEach { (l, v) ->
-                        val c = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; background = ui.rounded(Color.parseColor("#F5EFE3"), 10); setPadding(0, ui.dp(8), 0, ui.dp(8)) }
-                        c.addView(ui.text(l, 12f, Colors.MUTED).apply { gravity = Gravity.CENTER })
-                        c.addView(ui.text(v, 19f, ui.theme.primary, bold = true).apply { gravity = Gravity.CENTER })
-                        r.addView(c, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(ui.dp(3), ui.dp(3), ui.dp(3), ui.dp(3)) })
-                    }
-                    addView(r)
-                }
-                addView(ui.text("عقد النكاح: ${day.mark.ifBlank { "-" }}   •   السكن: ${day.sakan.ifBlank { "-" }}   •   الحجامة: ${day.hijama}   •   الطالع: ${day.tale}", 13f, Colors.TEXT, bold = true).apply { setPadding(0, ui.dp(8), 0, 0) })
-            })
+            col.addView(card)
         }
 
-        col.addView(ui.card(Color.parseColor("#FFFBF3"), ui.theme.primary).apply {
-            addView(ui.title("🔔 إشعارات مواقيت الصلاة (خارج التطبيق)"))
-            Dialogs.notificationSettings(this@MainActivity, this)
+        // Duas
+        col.addView(ui.text("🤲 الأدعية والزيارات", 17f, ui.theme.primary, bold = true), ui.match(4, 14, 4, 4))
+        val duas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+        Duas.ALL.forEach { dua ->
+            val hasAudio = hasAudio(dua)
+            duas.addView(ui.text((if (hasAudio) "🔊 " else "") + dua.title, 14f, ui.theme.primary, bold = true).apply {
+                gravity = Gravity.CENTER
+                setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12))
+                background = ui.rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
+                setOnClickListener { showDua(dua) }
+            }, ui.wrap(4, 0, 4, 0))
+        }
+        col.addView(HorizontalScrollView(this).apply {
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            isHorizontalScrollBarEnabled = false
+            addView(duas)
         })
 
-        col.addView(ui.card().apply {
-            addView(ui.title("🤲 الأدعية والزيارات"))
-            Duas.ALL.forEach { dua -> addView(ui.outlineButton(dua.title) { showDua(dua) }) }
-        })
-
-        col.addView(ui.card().apply {
-            addView(ui.title("التحديثات"))
-            addView(ui.text("الإصدار الحالي: ${BuildConfig.VERSION_NAME}", 14f, Colors.TEXT))
-            addView(ui.primaryButton("التحقق من وجود تحديث") { Updater.check(this@MainActivity, manual = true) { showUpdateBanner(it) } })
-            addView(ui.outlineButton("مشاركة رابط تحميل التطبيق") {
-                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, "تطبيق تقويم الزهراء - الأحساء ١٤٤٨هـ\n${Updater.APK_URL}")
-                }, "مشاركة التطبيق"))
-            })
-            addView(ui.outlineButton("للتواصل والدعم") { Dialogs.contact(this@MainActivity) })
-        })
+        // Month occasions log
+        val logTitle = ui.text("", 17f, ui.theme.primary, bold = true)
+        col.addView(logTitle, ui.match(4, 18, 4, 2))
+        val logHost = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var bar: MonthBar
+        fun fillLog(m: Int) {
+            logTitle.text = "سجل مناسبات شهر ${CalendarData.MONTHS[m - 1]} ${CalendarData.ar(CalendarData.YEAR)} هـ"
+            logHost.removeAllViews()
+            CalendarData.month(this, m).forEach { d -> logHost.addView(logRow(d)) }
+        }
+        bar = MonthBar(month) { m -> month = m; bar.select(m); fillLog(m) }
+        col.addView(bar.view, ui.match(-14, 0, -14, 4))
+        col.addView(logHost)
+        fillLog(month)
         return ui.scroll(col)
     }
 
+    /** One day in the month log, styled like the original app (black card for sorrow days). */
+    private fun logRow(d: Day): View {
+        val isToday = d.greg == LocalDate.now()
+        val dark = d.isSorrow
+        val bg = when { dark -> Color.parseColor("#1E1E1E"); d.isJoy -> Color.parseColor("#FFF8D6"); isToday -> Color.parseColor("#FFF7E3"); else -> Color.WHITE }
+        val stroke = if (isToday) ui.theme.accent else if (dark) Color.parseColor("#3A3A3A") else Color.parseColor("#E8DFD0")
+        val card = ui.row().apply {
+            gravity = Gravity.TOP
+            background = ui.rounded(bg, 16, stroke, if (isToday) 2 else 1)
+            setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14))
+            setOnClickListener { Dialogs.day(this@MainActivity, d) }
+        }
+        card.addView(Dialogs.dayCircle(this, d, 46, onDark = dark))
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(12), 0, 0, 0) }
+        val top = ui.row()
+        top.addView(ui.text("${CalendarData.weekday(d)} • ${d.greg.dayOfMonth}/${d.greg.monthValue}", 13f, if (dark) Color.parseColor("#BFBFBF") else Colors.MUTED), ui.weight())
+        val tag = when {
+            dark -> "🏴 شهادة / وفاة" to Color.WHITE
+            d.isJoy -> "🌸 مولد / فرح" to Color.parseColor("#9A7400")
+            d.mark.isNotBlank() -> "عقد النكاح: ${d.mark}" to (if (d.mark == "جيد") Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
+            else -> null
+        }
+        tag?.let { (s, c) -> top.addView(ui.text(s, 12.5f, c, bold = true)) }
+        body.addView(top)
+        val sb = SpannableStringBuilder()
+        d.occasions.forEachIndexed { i, o ->
+            if (i > 0) sb.append("\n")
+            val s = sb.length
+            sb.append(o.text)
+            val c = if (dark) Color.WHITE else Colors.occasion(o.color)
+            sb.setSpan(ForegroundColorSpan(c), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        body.addView(ui.text(sb, 15.5f, Colors.TEXT, bold = true).apply { setPadding(0, ui.dp(6), 0, 0); setLineSpacing(0f, 1.25f) })
+        card.addView(body, ui.weight())
+        val wrap = FrameLayout(this)
+        wrap.addView(card)
+        wrap.layoutParams = ui.match(0, 5, 0, 5)
+        return wrap
+    }
+
+    private fun hasAudio(dua: Dua) = runCatching { assets.list("audio")?.contains(dua.audio) == true }.getOrDefault(false)
+
     private fun showDua(dua: Dua) {
         Dialogs.sheet(this, "🤲", dua.title, null) { col, dialog ->
-            val hasAudio = runCatching { assets.list("audio")?.contains(dua.audio) == true }.getOrDefault(false)
-            val play = ui.primaryButton(if (hasAudio) "▶ تشغيل الصوت" else "الصوت سيضاف في التحديث القادم") {}
-            if (hasAudio) play.setOnClickListener {
+            val audio = hasAudio(dua)
+            val play = ui.primaryButton(if (audio) "▶ تشغيل الصوت" else "🔇 الصوت سيضاف في تحديث قادم") {}
+            if (audio) play.setOnClickListener {
                 val pl = player
                 if (pl != null && pl.isPlaying) { pl.pause(); play.text = "▶ تشغيل الصوت" }
                 else if (pl != null) { pl.start(); play.text = "⏸ إيقاف مؤقت" }
@@ -433,7 +455,7 @@ class MainActivity : Activity() {
                 }.onFailure { Toast.makeText(this, "تعذر تشغيل الصوت", Toast.LENGTH_LONG).show() }
             }
             col.addView(play)
-            col.addView(ui.text(dua.text, 21f, Colors.TEXT).apply { typeface = android.graphics.Typeface.SERIF; setLineSpacing(0f, 1.6f); setPadding(0, ui.dp(8), 0, 0) })
+            col.addView(ui.text(dua.text, 21f, Colors.TEXT).apply { typeface = Typeface.SERIF; setLineSpacing(0f, 1.6f); setPadding(0, ui.dp(8), 0, 0) })
             dialog.setOnDismissListener { player?.release(); player = null }
         }
     }
@@ -442,34 +464,15 @@ class MainActivity : Activity() {
 
     private fun pagesTab(): View {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-        val zoomLabel = ui.text("100%", 15f, Color.parseColor("#2A1A00"), bold = true).apply {
-            gravity = Gravity.CENTER
-            setPadding(ui.dp(14), ui.dp(6), ui.dp(14), ui.dp(6))
-            background = ui.rounded(ui.theme.accent, 16)
-        }
         lateinit var bar: MonthBar
-        val web = PagesView.all(this, month, { pct -> zoomLabel.text = "$pct%" }) { visible ->
+        val web = PagesView.all(this, month, {}) { visible ->
             if (visible in 1..12) { month = visible; bar.select(visible) }
         }
         pagesWeb = web
-        bar = MonthBar(month, true) { m ->
-            if (m in 1..12) { month = m; bar.select(m) }
-            PagesView.scrollTo(web, m)
-        }
+        bar = MonthBar(month) { m -> month = m; bar.select(m); PagesView.scrollTo(web, m) }
         pagesBar = bar
         box.addView(bar.view)
-
-        val frame = FrameLayout(this)
-        frame.addView(web)
-        val zbar = ui.row().apply {
-            background = ui.rounded(Color.parseColor("#E61E1E1E"), 30, ui.theme.accent, 1)
-            setPadding(ui.dp(10), ui.dp(6), ui.dp(10), ui.dp(6))
-        }
-        zbar.addView(icon("🔍+", 18f) { web.zoomIn() })
-        zbar.addView(zoomLabel, ui.wrap(6, 0, 6, 0))
-        zbar.addView(icon("🔍−", 18f) { web.zoomOut() })
-        frame.addView(zbar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = ui.dp(16) })
-        box.addView(frame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        box.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         return box
     }
 

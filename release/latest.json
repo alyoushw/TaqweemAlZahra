@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "2.2.0",
+  "versionCode": 5,
+  "versionName": "3.0.0",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "إشعار التحديث داخل التطبيق عند كل فتح، والتحديث يتنزل ويتثبت من داخل التطبيق مباشرة."
+  "notes": "تصميم أنظف: الصفحة الرئيسية فيها الشهور والتقويم فقط، تفاصيل اليوم مع المشاركة، سجل مناسبات الشهر والأدعية في التقويم التفاعلي، وكل الإعدادات في زر ⚙ واحد."
 }

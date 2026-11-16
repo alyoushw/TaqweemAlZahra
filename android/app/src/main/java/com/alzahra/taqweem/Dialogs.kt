@@ -211,50 +211,128 @@ object Dialogs {
     }
 
     // ---------- تفاصيل اليوم ----------
-    fun day(activity: Activity, d: Day) {
-        sheet(activity, "📅", "${CalendarData.weekday(d)} ${CalendarData.hijriLabel(d)}", "${CalendarData.gregLabel(d.greg)}م  •  أم القرى: ${CalendarData.ar(d.ummAlQura)}") { col, _ ->
-            val ui = Ui(activity)
-            val labels = buildList {
-                if (d.isSorrow) add("يوم حزن" to Colors.SORROW)
-                if (d.isJoy) add("يوم فرح" to Color.parseColor("#B8860B"))
-                if (d.gregColor == "G") add("إجازة رسمية" to Color.parseColor("#558B2F"))
-                if (d.gregColor == "O") add("أول يوم في الدوام الرسمي" to Colors.FIRST_WORK)
-                if (d.ummAlQuraColor == "D") add("من أفضل أيام السنة للصوم" to Colors.BEST_FAST)
+    /** The Zahra day number in a circle, coloured as in the calendar (black = sorrow, yellow = joy). */
+    fun dayCircle(activity: Activity, d: Day, sizeDp: Int, onDark: Boolean = false): android.widget.TextView {
+        val ui = Ui(activity)
+        val (fill, fg) = when {
+            d.isSorrow -> Color.parseColor("#111111") to Color.WHITE
+            d.isJoy -> Color.parseColor("#FFD600") to Color.BLACK
+            onDark -> Color.TRANSPARENT to Color.WHITE
+            else -> Color.parseColor("#FFF8EC") to ui.theme.primary
+        }
+        return ui.text(d.zahra.toString(), sizeDp * 0.42f, fg, bold = true).apply {
+            gravity = Gravity.CENTER
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(fill)
+                setStroke(ui.dp(2), ui.theme.accent)
             }
-            if (labels.isNotEmpty()) {
-                val r = ui.row()
-                labels.forEach { (l, c) -> r.addView(ui.text(l, 13f, Color.WHITE, bold = true).apply { setPadding(ui.dp(10), ui.dp(4), ui.dp(10), ui.dp(4)); background = ui.rounded(c, 12) }, ui.wrap(0, 0, 6, 8)) }
-                col.addView(r)
+            layoutParams = LinearLayout.LayoutParams(ui.dp(sizeDp), ui.dp(sizeDp))
+        }
+    }
+
+    private fun shareText(d: Day): String = buildString {
+        append("📅 ${CalendarData.weekday(d)} ${d.zahra} ${CalendarData.MONTHS[d.month - 1]} ${CalendarData.YEAR}هـ\n")
+        append("${CalendarData.gregLabel(d.greg)}م\n")
+        if (d.occasions.isNotEmpty()) { append("\n"); d.occasions.forEach { append("• ${it.text}\n") } }
+        append("\n🕌 مواقيت الأحساء:\n")
+        append("الإمساك ${d.times.imsak} | الصبح ${d.times.fajr} | الشروق ${d.times.sunrise}\n")
+        append("الظهر ${d.times.dhuhr} | المغرب ${d.times.maghrib} | منتصف الليل ${d.times.midnight}\n")
+        val extra = listOf("عقد النكاح" to d.mark, "الحجامة" to d.hijama).filter { it.second.isNotBlank() }
+        if (extra.isNotEmpty()) append("\n" + extra.joinToString(" | ") { "${it.first}: ${it.second}" } + "\n")
+        append("\n— تقويم الزهراء - الأحساء\n${Updater.APK_URL}")
+    }
+
+    fun day(activity: Activity, d: Day) {
+        sheet(activity, "📅", "تفاصيل اليوم", null) { col, _ ->
+            val ui = Ui(activity)
+            val dark = d.isSorrow
+
+            // Header card
+            val head = ui.card(if (dark) Color.parseColor("#1E1E1E") else if (d.isJoy) Color.parseColor("#FFF8D6") else Color.WHITE, ui.theme.accent)
+            val r = ui.row()
+            r.addView(dayCircle(activity, d, 60, onDark = dark))
+            val info = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(14), 0, 0, 0) }
+            info.addView(ui.text("${CalendarData.weekday(d)} • ${CalendarData.gregLabel(d.greg)}م", 13.5f, if (dark) Color.parseColor("#BFBFBF") else Colors.MUTED))
+            info.addView(ui.text("${CalendarData.ar(d.zahra)} ${CalendarData.MONTHS[d.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ", 20f, if (dark) Color.WHITE else ui.theme.primary, bold = true))
+            info.addView(ui.text("أم القرى: ${CalendarData.ar(d.ummAlQura)}", 13f, if (dark) Color.parseColor("#BFBFBF") else Colors.MUTED))
+            r.addView(info, ui.weight())
+            head.addView(r)
+            val tags = buildList {
+                if (d.isSorrow) add("🏴 شهادة / وفاة" to Color.parseColor("#444444"))
+                if (d.isJoy) add("🌸 مولد / فرح" to Color.parseColor("#B8860B"))
+                if (d.gregColor == "G") add("إجازة رسمية" to Color.parseColor("#558B2F"))
+                if (d.gregColor == "O") add("أول يوم دوام" to Colors.FIRST_WORK)
+                if (d.ummAlQuraColor == "D") add("أفضل أيام الصوم" to Colors.BEST_FAST)
+            }
+            if (tags.isNotEmpty()) {
+                val tr = ui.row().apply { setPadding(0, ui.dp(10), 0, 0) }
+                tags.forEach { (l, c) -> tr.addView(ui.text(l, 12.5f, Color.WHITE, bold = true).apply { setPadding(ui.dp(10), ui.dp(4), ui.dp(10), ui.dp(4)); background = ui.rounded(c, 12) }, ui.wrap(0, 0, 6, 0)) }
+                head.addView(tr)
             }
             if (d.occasions.isNotEmpty()) {
                 val sb = SpannableStringBuilder()
                 d.occasions.forEachIndexed { i, o ->
                     if (i > 0) sb.append("\n")
                     val s = sb.length
-                    sb.append("• ").append(o.text)
-                    sb.setSpan(ForegroundColorSpan(Colors.occasion(o.color)), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    sb.append(o.text)
+                    sb.setSpan(ForegroundColorSpan(if (dark) Color.WHITE else Colors.occasion(o.color)), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
-                col.addView(ui.card().apply { addView(ui.text(sb, 16f, Colors.TEXT, bold = true).apply { setLineSpacing(0f, 1.3f) }) })
+                head.addView(ui.text(sb, 16.5f, Colors.TEXT, bold = true).apply { setPadding(0, ui.dp(12), 0, 0); setLineSpacing(0f, 1.3f) })
             }
+            col.addView(head)
+
+            // Times
             val t = d.times
             val items = mutableListOf("الإمساك" to t.imsak, "الصبح" to t.fajr, "الشروق" to t.sunrise, "الظهر" to t.dhuhr, "المغرب" to t.maghrib, "منتصف الليل" to t.midnight)
+            if (t.sahur.isNotBlank()) items.add(0, "السحور" to t.sahur)
             if (t.qibla.isNotBlank()) items += "القبلة" to t.qibla
-            if (t.sahur.isNotBlank()) items += "السحور" to t.sahur
-            items.chunked(4).forEach { chunk ->
-                val r = ui.row()
+            val times = ui.card()
+            items.chunked(3).forEach { chunk ->
+                val row = ui.row()
                 chunk.forEach { (l, v) ->
-                    val c = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; background = ui.rounded(Color.WHITE, 10, Color.parseColor("#E6DCCB"), 1); setPadding(0, ui.dp(8), 0, ui.dp(8)) }
+                    val c = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(0, ui.dp(6), 0, ui.dp(6)) }
                     c.addView(ui.text(l, 12f, Colors.MUTED).apply { gravity = Gravity.CENTER })
-                    c.addView(ui.text(v, 17f, ui.theme.primary, bold = true).apply { gravity = Gravity.CENTER })
-                    r.addView(c, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(ui.dp(3), ui.dp(3), ui.dp(3), ui.dp(3)) })
+                    c.addView(ui.text(v, 18f, ui.theme.primary, bold = true).apply { gravity = Gravity.CENTER })
+                    row.addView(c, ui.weight())
                 }
-                repeat(4 - chunk.size) { r.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f)) }
-                col.addView(r)
+                repeat(3 - chunk.size) { row.addView(View(activity), ui.weight()) }
+                times.addView(row)
             }
-            val info = listOf("عقد النكاح" to d.mark, "السكن" to d.sakan, "الحجامة" to d.hijama, "الطالع" to d.tale).filter { it.second.isNotBlank() }
-            col.addView(ui.card().apply {
-                info.forEach { (k, v) -> addView(ui.text("$k:  $v", 15f, Colors.TEXT, bold = true).apply { setPadding(0, ui.dp(3), 0, ui.dp(3)) }) }
-            })
+            col.addView(times)
+
+            // Other columns as small pills
+            val info2 = listOf("عقد النكاح" to d.mark, "السكن" to d.sakan, "الحجامة" to d.hijama, "الطالع" to d.tale).filter { it.second.isNotBlank() }
+            info2.chunked(2).forEach { chunk ->
+                val row = ui.row()
+                chunk.forEach { (k, v) ->
+                    val bad = v == "غير صالح" || v.startsWith("ردي") || (k == "عقد النكاح" && v != "جيد")
+                    row.addView(ui.text("$k: $v", 14f, if (bad) Color.parseColor("#C62828") else Color.parseColor("#2E7D32"), bold = true).apply {
+                        gravity = Gravity.CENTER
+                        setPadding(ui.dp(6), ui.dp(10), ui.dp(6), ui.dp(10))
+                        background = ui.rounded(Color.WHITE, 12, Color.parseColor("#E8DFD0"), 1)
+                    }, ui.weight().apply { setMargins(ui.dp(3), ui.dp(3), ui.dp(3), ui.dp(3)) })
+                }
+                col.addView(row)
+            }
+
+            // Share
+            val text = shareText(d)
+            val sr = ui.row().apply { setPadding(0, ui.dp(8), 0, 0) }
+            sr.addView(ui.primaryButton("مشاركة") {
+                activity.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }, "مشاركة اليوم"))
+            }, ui.weight().apply { setMargins(ui.dp(3), 0, ui.dp(3), 0) })
+            sr.addView(ui.primaryButton("واتساب") {
+                val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text); setPackage("com.whatsapp") }
+                runCatching { activity.startActivity(i) }.onFailure {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/?text=" + Uri.encode(text))))
+                }
+            }, ui.weight().apply { setMargins(ui.dp(3), 0, ui.dp(3), 0) })
+            sr.addView(ui.outlineButton("نسخ") {
+                activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("taqweem", text))
+                Toast.makeText(activity, "تم نسخ تفاصيل اليوم", Toast.LENGTH_SHORT).show()
+            }, ui.weight().apply { setMargins(ui.dp(3), 0, ui.dp(3), 0) })
+            col.addView(sr)
         }
     }
 

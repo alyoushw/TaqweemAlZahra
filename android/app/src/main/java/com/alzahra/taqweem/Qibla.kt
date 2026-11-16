@@ -140,7 +140,7 @@ object Qibla {
         compassBox.addView(styles, ui.match(0, 0, 0, 10))
         val compass = CompassView(activity, ui.theme.primary, ui.theme.accent)
         compassBox.addView(compass, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        val big = ui.text("", 40f, ui.theme.primary, bold = true).apply { gravity = Gravity.CENTER }
+        val big = ui.text("", 40f, ui.ink, bold = true).apply { gravity = Gravity.CENTER }
         val hint = ui.text("", 18f, Color.parseColor("#E65100"), bold = true).apply { gravity = Gravity.CENTER }
         compassBox.addView(big, ui.match())
         compassBox.addView(hint, ui.match(0, 2, 0, 8))
@@ -149,8 +149,8 @@ object Qibla {
         fun paintStyles() {
             val s = style(activity)
             styleViews.forEachIndexed { i, v ->
-                v.background = if (i == s) ui.rounded(ui.theme.primary, 12) else ui.rounded(Color.WHITE, 12, Color.parseColor("#E3D6C2"), 1)
-                v.setTextColor(if (i == s) Color.WHITE else Colors.TEXT)
+                v.background = if (i == s) ui.rounded(ui.fill, 12) else ui.rounded(Colors.CARD, 12, Colors.STROKE, 1)
+                v.setTextColor(if (i == s) ui.onFill else Colors.TEXT)
             }
             compass.style = s
             compassBox.setBackgroundColor(when (s) { 1 -> Color.parseColor("#121A20"); 2 -> ui.theme.primaryDark; else -> Colors.BG })
@@ -356,7 +356,7 @@ class CompassView(ctx: Context, private val primary: Int, private val gold: Int)
         }
         p.style = Paint.Style.FILL; p.textAlign = Paint.Align.CENTER; p.textSize = r * 0.13f
         listOf("ش" to 0f, "ق" to 90f, "ج" to 180f, "غ" to 270f).forEach { (t, a) ->
-            p.color = if (t == "ش") Color.parseColor("#C62828") else Color.parseColor("#8A7A5A")
+            p.color = if (t == "ش") Colors.BAD else Color.parseColor("#8A7A5A")
             val ra = Math.toRadians((a - 90).toDouble())
             c.drawText(t, cx + (r * 0.72f) * cos(ra).toFloat(), cy + (r * 0.72f) * sin(ra).toFloat() + p.textSize / 3, p)
         }

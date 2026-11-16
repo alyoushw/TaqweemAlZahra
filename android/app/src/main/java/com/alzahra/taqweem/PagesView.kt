@@ -32,8 +32,8 @@ object PagesView {
         }
         return """<!doctype html><html dir="rtl"><head><meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes">
 <style>
-body{margin:0;padding:8px;background:#F5EFE6;font-family:sans-serif}
-.card{background:#fff;border:2px solid $a;border-radius:16px;overflow:hidden;margin:0 0 14px}
+body{margin:0;padding:8px;background:${String.format("#%06X", 0xFFFFFF and Colors.BG)};font-family:sans-serif}
+.card{background:${String.format("#%06X", 0xFFFFFF and Colors.CARD)};border:2px solid $a;border-radius:16px;overflow:hidden;margin:0 0 14px}
 .head{background:$p;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:8px}
 .t{font-weight:bold;font-size:15px}
 .n{background:$a;color:#3a2a00;border-radius:8px;padding:5px 9px;font-weight:bold;font-size:13px;white-space:nowrap}

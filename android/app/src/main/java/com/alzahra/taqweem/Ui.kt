@@ -29,9 +29,9 @@ data class AppTheme(
 object Themes {
     val ALL = listOf(
         AppTheme("dark", "الوضع الداكن الفاخر", "مظهر ليلي مريح للعين مع إبراز ذهبي خاشع لليوم الحالي",
-            Color.parseColor("#1E2A33"), Color.parseColor("#121A20"), Color.parseColor("#E0B84A"), Color.parseColor("#FFF3CC"), Color.parseColor("#0F151A"), dark = true),
+            Color.parseColor("#1A2530"), Color.parseColor("#121A22"), Color.parseColor("#E0B84A"), Color.parseColor("#3A3420"), Color.parseColor("#10161C"), dark = true),
         AppTheme("maroon", "عنابي تقويم الزهراء الأصيل", "اللون العنابي التراثي المستوحى من تقويم الزهراء الورقي",
-            Color.parseColor("#6B1723"), Color.parseColor("#4A0F18"), Color.parseColor("#D4A92F"), Color.parseColor("#FCE4EA"), Color.parseColor("#F5EFE6")),
+            Color.parseColor("#6B1723"), Color.parseColor("#4A0F18"), Color.parseColor("#D4A92F"), Colors.SELECTED, Colors.SOFT),
         AppTheme("green", "الأخضر الزمردي الإسلامي", "أخضر رحماني بهيج يعكس روح الهداية والسكينة",
             Color.parseColor("#1B6B2A"), Color.parseColor("#11471B"), Color.parseColor("#E0C35A"), Color.parseColor("#E3F4E5"), Color.parseColor("#F1F5EE")),
         AppTheme("gold", "الذهبي الملكي المشرف", "ذهبي المشاهد المقدسة والعتبات المنورة",
@@ -42,7 +42,9 @@ object Themes {
 
     fun current(ctx: Context): AppTheme {
         val id = ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE).getString("theme", "maroon")
-        return ALL.firstOrNull { it.id == id } ?: ALL[1]
+        val t = ALL.firstOrNull { it.id == id } ?: ALL[1]
+        Colors.dark = t.dark
+        return t
     }
 
     fun set(ctx: Context, id: String) =
@@ -52,6 +54,11 @@ object Themes {
 /** Small view-building helpers shared by the screens. */
 class Ui(val ctx: Context) {
     val theme get() = Themes.current(ctx)
+    /** Colour for headings/accent text: brand colour on light, gold on dark. */
+    val ink get() = if (theme.dark) theme.accent else theme.primary
+    /** Fill of selected chips and main buttons, and the text on top of it. */
+    val fill get() = if (theme.dark) theme.accent else theme.primary
+    val onFill get() = if (theme.dark) Color.parseColor("#14181C") else Color.WHITE
     private val density = ctx.resources.displayMetrics.density
     fun dp(v: Int) = (v * density).toInt()
     fun dpf(v: Float) = (v * density).toInt()
@@ -93,24 +100,24 @@ class Ui(val ctx: Context) {
     fun weight(w: Float = 1f) = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, w)
 
     /** Filled theme button. */
-    fun primaryButton(label: String, onClick: () -> Unit) = text(label, 15f, Color.WHITE, bold = true).apply {
+    fun primaryButton(label: String, onClick: () -> Unit) = text(label, 15f, onFill, bold = true).apply {
         gravity = Gravity.CENTER
         setPadding(dp(16), dp(14), dp(16), dp(14))
-        background = rounded(theme.primary, 14)
+        background = rounded(fill, 14)
         layoutParams = match(0, 6, 0, 6)
         setOnClickListener { onClick() }
     }
 
     /** Outlined button. */
-    fun outlineButton(label: String, onClick: () -> Unit) = text(label, 15f, theme.primary, bold = true).apply {
+    fun outlineButton(label: String, onClick: () -> Unit) = text(label, 15f, ink, bold = true).apply {
         gravity = Gravity.CENTER
         setPadding(dp(16), dp(13), dp(16), dp(13))
-        background = rounded(Color.WHITE, 14, Color.parseColor("#DDCFB8"), 1)
+        background = rounded(Colors.CARD, 14, Colors.STROKE, 1)
         layoutParams = match(0, 6, 0, 6)
         setOnClickListener { onClick() }
     }
 
-    fun card(bg: Int = Color.WHITE, stroke: Int = Color.parseColor("#E6DCCB")) = LinearLayout(ctx).apply {
+    fun card(bg: Int = Colors.CARD, stroke: Int = Colors.STROKE) = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
         background = rounded(bg, 18, stroke, 1)
@@ -118,7 +125,7 @@ class Ui(val ctx: Context) {
         layoutParams = match(0, 6, 0, 6)
     }
 
-    fun title(s: String, size: Float = 17f) = text(s, size, theme.primary, bold = true).apply { setPadding(0, dp(4), 0, dp(8)) }
+    fun title(s: String, size: Float = 17f) = text(s, size, ink, bold = true).apply { setPadding(0, dp(4), 0, dp(8)) }
 
     fun toggle(label: String, initial: Boolean, onChange: (Boolean) -> Unit) = Switch(ctx).apply {
         text = label
@@ -131,10 +138,10 @@ class Ui(val ctx: Context) {
     }
 
     /** Rounded "chip" used for the month bar and tabs. */
-    fun chip(label: String, selected: Boolean, onClick: () -> Unit) = text(label, 15f, if (selected) Color.WHITE else Colors.TEXT, bold = selected).apply {
+    fun chip(label: String, selected: Boolean, onClick: () -> Unit) = text(label, 15f, if (selected) onFill else Colors.TEXT, bold = selected).apply {
         gravity = Gravity.CENTER
         setPadding(dp(18), dp(10), dp(18), dp(10))
-        background = if (selected) rounded(theme.primary, 14) else rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
+        background = if (selected) rounded(fill, 14) else rounded(Colors.CARD, 14, Colors.STROKE, 1)
         layoutParams = wrap(4, 0, 4, 0)
         setOnClickListener { onClick() }
     }

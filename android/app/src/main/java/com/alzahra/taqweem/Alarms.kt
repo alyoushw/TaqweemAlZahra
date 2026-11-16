@@ -25,8 +25,13 @@ object Prefs {
     fun prayerOn(ctx: Context, p: Prayer) = sp(ctx).getBoolean("notify_${p.key}", p in DEFAULT_ON)
     fun setPrayerOn(ctx: Context, p: Prayer, on: Boolean) = sp(ctx).edit().putBoolean("notify_${p.key}", on).apply()
 
-    fun occasionOn(ctx: Context) = sp(ctx).getBoolean("notify_occasion", true)
-    fun setOccasionOn(ctx: Context, on: Boolean) = sp(ctx).edit().putBoolean("notify_occasion", on).apply()
+    const val OCC_SAME = "same"
+    const val OCC_BEFORE = "before"
+    const val OCC_OFF = "off"
+    /** How religious occasions are reminded: on the day, the evening before, or not at all. */
+    fun occasionMode(ctx: Context): String = sp(ctx).getString("occasion_mode", null)
+        ?: if (sp(ctx).getBoolean("notify_occasion", true)) OCC_SAME else OCC_OFF
+    fun setOccasionMode(ctx: Context, m: String) = sp(ctx).edit().putString("occasion_mode", m).apply()
 
     fun lastUpdateCheck(ctx: Context) = sp(ctx).getLong("last_update_check", 0L)
     fun setLastUpdateCheck(ctx: Context, t: Long) = sp(ctx).edit().putLong("last_update_check", t).apply()
@@ -85,13 +90,20 @@ object Notifier {
         ctx.getSystemService(NotificationManager::class.java).notify(100 + p.ordinal, n)
     }
 
-    fun showOccasion(ctx: Context, day: Day) {
+    /** Births and martyrdoms — the days the calendar marks yellow or black. */
+    fun isReligious(day: Day) = (day.isSorrow || day.isJoy) && day.occasions.isNotEmpty()
+
+    /** @param eve true for the evening-before reminder ("ليلة المناسبة"). */
+    fun showOccasion(ctx: Context, day: Day, eve: Boolean = false) {
         if (day.occasions.isEmpty()) return
         ensureChannels(ctx)
         val body = day.occasions.joinToString("\n") { it.text }
+        val kind = if (day.isSorrow) "🏴" else "🌸"
+        val title = if (eve) "$kind الليلة: مناسبة غدٍ ${CalendarData.weekday(day)} ${CalendarData.hijriLabel(day)}"
+            else "$kind مناسبة اليوم ${CalendarData.hijriLabel(day)}"
         val n = Notification.Builder(ctx, CH_OCCASION)
             .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("${CalendarData.weekday(day)} ${CalendarData.hijriLabel(day)}")
+            .setContentTitle(title)
             .setContentText(day.occasions.first().text)
             .setStyle(Notification.BigTextStyle().bigText(body))
             .setAutoCancel(true)
@@ -113,7 +125,9 @@ object AlarmScheduler {
     private const val KIND_PRAYER = "prayer"
     private const val KIND_OCCASION = "occasion"
     private const val KIND_REFRESH = "refresh"
+    private const val KIND_EVE = "eve"
     private val OCCASION_TIME: LocalTime = LocalTime.of(7, 0)
+    private val EVE_TIME: LocalTime = LocalTime.of(19, 0)
 
     private data class Next(val at: LocalDateTime, val kind: String, val prayer: Prayer? = null, val label: String = "")
 
@@ -129,8 +143,12 @@ object AlarmScheduler {
                 candidates += if (Prefs.prayerOn(ctx, p)) Next(date.atTime(t), KIND_PRAYER, p, rawTime(day, p))
                 else Next(date.atTime(t), KIND_REFRESH)
             }
-            if (Prefs.occasionOn(ctx) && day.occasions.isNotEmpty()) {
-                candidates += Next(date.atTime(OCCASION_TIME), KIND_OCCASION)
+            when (Prefs.occasionMode(ctx)) {
+                Prefs.OCC_SAME -> if (Notifier.isReligious(day)) candidates += Next(date.atTime(OCCASION_TIME), KIND_OCCASION)
+                Prefs.OCC_BEFORE -> {
+                    val tomorrow = CalendarData.byDate(ctx, date.plusDays(1))
+                    if (tomorrow != null && Notifier.isReligious(tomorrow)) candidates += Next(date.atTime(EVE_TIME), KIND_EVE)
+                }
             }
         }
         return candidates.filter { it.at.isAfter(now.plusSeconds(5)) }.minByOrNull { it.at }
@@ -172,6 +190,7 @@ object AlarmScheduler {
                 if (p != null) Notifier.showPrayer(ctx, p, intent.getStringExtra(EXTRA_TIME) ?: "")
             }
             KIND_OCCASION -> CalendarData.byDate(ctx, LocalDateTime.now().toLocalDate())?.let { Notifier.showOccasion(ctx, it) }
+            KIND_EVE -> CalendarData.byDate(ctx, LocalDateTime.now().toLocalDate().plusDays(1))?.let { Notifier.showOccasion(ctx, it, eve = true) }
         }
     }
 }

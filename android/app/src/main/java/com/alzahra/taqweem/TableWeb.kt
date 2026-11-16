@@ -19,6 +19,19 @@ object TableWeb {
 
     fun html(activity: Activity, month: Int): String {
         val t = Themes.current(activity)
+        val d = t.dark
+        val cText = if (d) "#E9EDF1" else "#1a1a1a"
+        val cCard = if (d) "#19222B" else "#fff"
+        val cAlt = if (d) "#1D2731" else "#FBF7F0"
+        val cLine = if (d) "#2D3A46" else "#e3d8c6"
+        val cRed = if (d) "#FF7B72" else "#C62828"
+        val cBlue = if (d) "#6CB6FF" else "#1565C0"
+        val cGreen = if (d) "#7EE081" else "#2E7D32"
+        val cPink = if (d) "#FF8FB8" else "#C2185B"
+        val cTale = if (d) "#3A3420" else "#F6E7A6"
+        val cMuted = if (d) "#97A4B0" else "#8a8a8a"
+        val cHead = if (d) "#1A2530" else hex(t.primary)
+        val cToday = if (d) "#E0B84A" else hex(t.primary)
         val days = CalendarData.month(activity, month)
         val today = LocalDate.now()
         val hasSakan = days.any { it.sakan.isNotBlank() }
@@ -72,23 +85,23 @@ object TableWeb {
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=0.25, maximum-scale=5, user-scalable=yes">
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;padding:4px 6px 24px;background:${hex(t.pageBg)};font-family:sans-serif;color:#1a1a1a}
-table{border-collapse:separate;border-spacing:0;background:#fff;border:2px solid ${hex(t.primary)};border-radius:10px;overflow:hidden;white-space:nowrap}
-th{position:sticky;top:0;z-index:2;background:${hex(t.primary)};color:#fff;font-size:15px;padding:10px 8px;border-left:1px solid ${hex(t.accent)};border-bottom:2px solid ${hex(t.accent)};line-height:1.25}
-td{font-size:16px;font-weight:bold;text-align:center;padding:0 6px;height:52px;border-left:1px solid #e3d8c6;border-bottom:1px solid #e3d8c6}
-tr.alt td{background:#FBF7F0}
-tr.today td{background:${hex(t.todayRow)};border-top:2px solid ${hex(t.primary)};border-bottom:2px solid ${hex(t.primary)}}
+body{margin:0;padding:4px 6px 24px;background:${hex(t.pageBg)};font-family:sans-serif;color:$cText}
+table{border-collapse:separate;border-spacing:0;background:$cCard;border:2px solid $cHead;border-radius:10px;overflow:hidden;white-space:nowrap}
+th{position:sticky;top:0;z-index:2;background:$cHead;color:#fff;font-size:15px;padding:10px 8px;border-left:1px solid ${hex(t.accent)};border-bottom:2px solid ${hex(t.accent)};line-height:1.25}
+td{font-size:16px;font-weight:bold;text-align:center;padding:0 6px;height:52px;border-left:1px solid $cLine;border-bottom:1px solid $cLine;color:$cText}
+tr.alt td{background:$cAlt}
+tr.today td{background:${hex(t.todayRow)};border-top:2px solid $cToday;border-bottom:2px solid $cToday}
 td.ev{text-align:right;min-width:430px;white-space:normal;line-height:1.35;font-size:15.5px;padding:4px 10px}
 th.ev{min-width:430px}
-.wd{min-width:74px}.fri{color:#C62828}
+.wd{min-width:74px}.fri{color:$cRed}
 .num{display:inline-block;min-width:46px;padding:9px 4px;border-radius:6px}
-.box{color:#fff}.k{background:#111}.y{background:#FFD600;color:#000}.d{background:#1B5E20}.n{background:#8D5A1E}
-.g{background:#8BC34A;color:#000}.o{background:#F4511E}.uq{color:#8a8a8a}
-.bad{background:#E0482A;display:inline-block;padding:9px 8px;border-radius:6px}
-.small{font-size:13px;line-height:1.2}.good{color:#1565C0}
-.red{color:#C62828}.grn{color:#2E7D32}.pink{color:#C2185B}.blue{color:#1565C0}
-.tale{background:#F6E7A6 !important;min-width:60px}
-.ck{color:#1a1a1a}.cr{color:#C62828}.cb{color:#1565C0}.cg{color:#2E7D32}
+.box{color:#fff}.k{background:#000;box-shadow:inset 0 0 0 1px #555}.y{background:#FFD600;color:#000}.d{background:#1B5E20}.n{background:#8D5A1E}
+.g{background:#8BC34A;color:#000}.o{background:#F4511E}.uq{color:$cMuted}
+.bad{background:#E0482A;color:#fff;display:inline-block;padding:9px 8px;border-radius:6px}
+.small{font-size:13px;line-height:1.2}.good{color:$cBlue}
+.red{color:$cRed}.grn{color:$cGreen}.pink{color:$cPink}.blue{color:$cBlue}
+.tale{background:$cTale !important;min-width:60px}
+.ck{color:$cText}.cr{color:$cRed}.cb{color:$cBlue}.cg{color:$cGreen}
 .note td{background:#D84315 !important;color:#fff;font-size:13px;height:auto;padding:8px;white-space:normal;text-align:right}
 </style></head><body>
 <table dir="rtl"><thead><tr>$head</tr></thead><tbody>$rows

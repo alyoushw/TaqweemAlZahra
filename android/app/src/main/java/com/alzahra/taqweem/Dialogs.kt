@@ -29,11 +29,11 @@ object Dialogs {
         val dialog = Dialog(activity)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val col = ui.column(18)
-        col.background = ui.rounded(Color.parseColor("#FAF6EE"), 24)
+        col.background = ui.rounded(Colors.BG, 24)
         val head = ui.row()
-        head.addView(ui.text(icon, 26f, ui.theme.primary), ui.wrap())
+        head.addView(ui.text(icon, 26f, ui.ink), ui.wrap())
         val ht = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, 0, 0) }
-        ht.addView(ui.text(title, 19f, ui.theme.primary, bold = true))
+        ht.addView(ui.text(title, 19f, ui.ink, bold = true))
         if (subtitle != null) ht.addView(ui.text(subtitle, 13f, Colors.MUTED))
         head.addView(ht, ui.weight())
         head.addView(ui.text("✕", 24f, Colors.TEXT).apply { setPadding(ui.dp(10), 0, ui.dp(6), 0); setOnClickListener { dialog.dismiss() } })
@@ -54,7 +54,7 @@ object Dialogs {
             val rows = ArrayList<Pair<AppTheme, LinearLayout>>()
             fun paint() = rows.forEach { (t, r) ->
                 val sel = t.id == chosen
-                r.background = ui.rounded(if (sel) Color.parseColor("#FCE4EA") else Color.WHITE, 18, if (sel) t.primary else Color.parseColor("#E6DCCB"), if (sel) 2 else 1)
+                r.background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 18, if (sel) t.primary else Colors.STROKE, if (sel) 2 else 1)
                 (r.getChildAt(2) as android.widget.TextView).text = if (sel) "◉" else "○"
             }
             Themes.ALL.forEach { t ->
@@ -122,13 +122,34 @@ object Dialogs {
             } + (time?.let { " ($it)" } ?: "")
             col.addView(ui.toggle(label, Prefs.prayerOn(activity, p)) { on -> Prefs.setPrayerOn(activity, p, on); AlarmScheduler.scheduleNext(activity) })
         }
-        col.addView(ui.toggle("إشعار مناسبة اليوم (٧ صباحاً)", Prefs.occasionOn(activity)) { on -> Prefs.setOccasionOn(activity, on); AlarmScheduler.scheduleNext(activity) })
-        col.addView(ui.text("🔊 صوت الأذان (الصبح والظهر والمغرب)", 16f, ui.theme.primary, bold = true), ui.match(0, 14, 0, 4))
+        col.addView(ui.text("📿 تذكير المناسبات الدينية (المواليد والشهادات)", 16f, ui.ink, bold = true), ui.match(0, 14, 0, 4))
+        val modeViews = ArrayList<Pair<String, android.widget.TextView>>()
+        fun paintModes() = modeViews.forEach { (id, v) ->
+            val sel = Prefs.occasionMode(activity) == id
+            v.text = (if (sel) "◉  " else "○  ") + v.tag as String
+            v.background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
+        }
+        listOf(
+            Prefs.OCC_SAME to "تذكير في نفس اليوم (٧ صباحاً)",
+            Prefs.OCC_BEFORE to "تذكير قبل المناسبة بيوم (ليلة المناسبة ٧ مساءً)",
+            Prefs.OCC_OFF to "بدون تذكير",
+        ).forEach { (id, title) ->
+            val v = ui.text(title, 15f, Colors.TEXT, bold = true).apply {
+                tag = title
+                setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
+                setOnClickListener { Prefs.setOccasionMode(activity, id); paintModes(); AlarmScheduler.scheduleNext(activity); ZahraWidget.updateAll(activity) }
+            }
+            modeViews += id to v
+            col.addView(v, ui.match(0, 3, 0, 3))
+        }
+        paintModes()
+        col.addView(ui.text("عند اختيار «قبل المناسبة بيوم» يعرض الودجت مناسبة اليوم ومناسبة الليلة (مناسبة الغد).", 12f, Colors.MUTED).apply { setPadding(0, ui.dp(4), 0, 0) })
+        col.addView(ui.text("🔊 صوت الأذان (الصبح والظهر والمغرب)", 16f, ui.ink, bold = true), ui.match(0, 14, 0, 4))
         val rows = ArrayList<Pair<String, android.widget.TextView>>()
         fun paint() = rows.forEach { (id, v) ->
             val sel = AdhanVoice.selectedId(activity) == id
             v.text = (if (sel) "◉  " else "○  ") + v.tag as String
-            v.background = ui.rounded(if (sel) Color.parseColor("#FCE4EA") else Color.WHITE, 14, if (sel) ui.theme.primary else Color.parseColor("#E3D6C2"), if (sel) 2 else 1)
+            v.background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
         }
         val choices = AdhanVoice.entries.map { it.id to it.title } + (AdhanVoice.SILENT to "إشعار فقط بدون صوت أذان")
         choices.forEach { (id, title) ->
@@ -168,8 +189,8 @@ object Dialogs {
             fun paintSizes() {
                 sizeViews.forEach { (s, v) ->
                     val sel = s == size
-                    v.setTextColor(if (sel) Color.WHITE else Colors.TEXT)
-                    v.background = if (sel) ui.rounded(ui.theme.primary, 14) else ui.rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
+                    v.setTextColor(if (sel) ui.onFill else Colors.TEXT)
+                    v.background = if (sel) ui.rounded(ui.fill, 14) else ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
                 }
                 installBtn.text = "➕ تثبيت ودجت (${size.title} ${size.cells}) على شاشة الهاتف"
             }
@@ -211,8 +232,30 @@ object Dialogs {
             }
             paintBg()
 
-            col.addView(ui.text("٣. خيارات المحتوى (ماذا سوف يظهر داخل الودجت):", 16f, Colors.TEXT, bold = true), ui.match(0, 14, 0, 4))
-            val opts = ui.card(Color.parseColor("#F3ECE0"))
+            col.addView(ui.text("٣. لون الخط:", 16f, Colors.TEXT, bold = true), ui.match(0, 14, 0, 4))
+            val fontViews = ArrayList<Pair<String, android.widget.TextView>>()
+            fun paintFont() = fontViews.forEach { (id, v) ->
+                val sel = WidgetPrefs.font(activity) == id
+                val swatch = if (id == "black") Color.parseColor("#E0E0E0") else Color.parseColor("#3A3F45")
+                v.background = ui.rounded(swatch, 12, if (sel) ui.theme.accent else Color.TRANSPARENT, 3)
+            }
+            WidgetPrefs.FONT_COLORS.chunked(3).forEach { chunk ->
+                val r = ui.row()
+                chunk.forEach { (id, name, c) ->
+                    val v = ui.text("Aa  $name", 14f, c, bold = true).apply {
+                        gravity = Gravity.CENTER
+                        setPadding(ui.dp(6), ui.dp(12), ui.dp(6), ui.dp(12))
+                        setOnClickListener { WidgetPrefs.setFont(activity, id); paintFont() }
+                    }
+                    fontViews += id to v
+                    r.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)) })
+                }
+                col.addView(r)
+            }
+            paintFont()
+
+            col.addView(ui.text("٤. خيارات المحتوى (ماذا سوف يظهر داخل الودجت):", 16f, Colors.TEXT, bold = true), ui.match(0, 14, 0, 4))
+            val opts = ui.card(Colors.SOFT)
             WidgetPrefs.OPTIONS.forEach { (key, label) ->
                 opts.addView(ui.toggle(label, WidgetPrefs.on(activity, key)) { WidgetPrefs.set(activity, key, it) })
             }
@@ -245,7 +288,7 @@ object Dialogs {
             d.isSorrow -> Color.parseColor("#111111") to Color.WHITE
             d.isJoy -> Color.parseColor("#FFD600") to Color.BLACK
             onDark -> Color.TRANSPARENT to Color.WHITE
-            else -> Color.parseColor("#FFF8EC") to ui.theme.primary
+            else -> Colors.SOFT to ui.ink
         }
         return ui.text(d.zahra.toString(), sizeDp * 0.42f, fg, bold = true).apply {
             gravity = Gravity.CENTER
@@ -276,12 +319,12 @@ object Dialogs {
             val dark = d.isSorrow
 
             // Header card
-            val head = ui.card(if (dark) Color.parseColor("#1E1E1E") else if (d.isJoy) Color.parseColor("#FFF8D6") else Color.WHITE, ui.theme.accent)
+            val head = ui.card(if (dark) Color.parseColor("#1E1E1E") else if (d.isJoy) Colors.JOY_SOFT else Colors.CARD, ui.theme.accent)
             val r = ui.row()
             r.addView(dayCircle(activity, d, 60, onDark = dark))
             val info = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(14), 0, 0, 0) }
             info.addView(ui.text("${CalendarData.weekday(d)} • ${CalendarData.gregLabel(d.greg)}م", 13.5f, if (dark) Color.parseColor("#BFBFBF") else Colors.MUTED))
-            info.addView(ui.text("${CalendarData.ar(d.zahra)} ${CalendarData.MONTHS[d.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ", 20f, if (dark) Color.WHITE else ui.theme.primary, bold = true))
+            info.addView(ui.text("${CalendarData.ar(d.zahra)} ${CalendarData.MONTHS[d.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ", 20f, if (dark) Color.WHITE else ui.ink, bold = true))
             info.addView(ui.text("أم القرى: ${CalendarData.ar(d.ummAlQura)}", 13f, if (dark) Color.parseColor("#BFBFBF") else Colors.MUTED))
             r.addView(info, ui.weight())
             head.addView(r)
@@ -320,7 +363,7 @@ object Dialogs {
                 chunk.forEach { (l, v) ->
                     val c = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(0, ui.dp(6), 0, ui.dp(6)) }
                     c.addView(ui.text(l, 12f, Colors.MUTED).apply { gravity = Gravity.CENTER })
-                    c.addView(ui.text(v, 18f, ui.theme.primary, bold = true).apply { gravity = Gravity.CENTER })
+                    c.addView(ui.text(v, 18f, ui.ink, bold = true).apply { gravity = Gravity.CENTER })
                     row.addView(c, ui.weight())
                 }
                 repeat(3 - chunk.size) { row.addView(View(activity), ui.weight()) }
@@ -334,10 +377,10 @@ object Dialogs {
                 val row = ui.row()
                 chunk.forEach { (k, v) ->
                     val bad = v == "غير صالح" || v.startsWith("ردي") || (k == "عقد النكاح" && v != "جيد")
-                    row.addView(ui.text("$k: $v", 14f, if (bad) Color.parseColor("#C62828") else Color.parseColor("#2E7D32"), bold = true).apply {
+                    row.addView(ui.text("$k: $v", 14f, if (bad) Colors.BAD else Colors.GOOD, bold = true).apply {
                         gravity = Gravity.CENTER
                         setPadding(ui.dp(6), ui.dp(10), ui.dp(6), ui.dp(10))
-                        background = ui.rounded(Color.WHITE, 12, Color.parseColor("#E8DFD0"), 1)
+                        background = ui.rounded(Colors.CARD, 12, Colors.STROKE, 1)
                     }, ui.weight().apply { setMargins(ui.dp(3), ui.dp(3), ui.dp(3), ui.dp(3)) })
                 }
                 col.addView(row)
@@ -393,7 +436,7 @@ object Dialogs {
             }
             col.addView(ui.card().apply {
                 addView(ui.text("المسؤول عن تقويم الزهراء", 13f, Colors.MUTED))
-                addView(ui.text(CONTACT_NAME, 20f, ui.theme.primary, bold = true))
+                addView(ui.text(CONTACT_NAME, 20f, ui.ink, bold = true))
             })
             col.addView(ui.card().apply {
                 addView(ui.text("رقم الجوال", 13f, Colors.MUTED))

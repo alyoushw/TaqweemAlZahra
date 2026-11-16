@@ -230,10 +230,10 @@ class MainActivity : Activity() {
             fun row(icon: String, title: String, subtitle: String, action: () -> Unit) {
                 val r = ui.row().apply {
                     setPadding(ui.dp(14), ui.dp(14), ui.dp(14), ui.dp(14))
-                    background = ui.rounded(Color.WHITE, 16, Color.parseColor("#ECE3D3"), 1)
+                    background = ui.rounded(Colors.CARD, 16, Colors.STROKE, 1)
                     setOnClickListener { dialog.dismiss(); action() }
                 }
-                r.addView(ui.text(icon, 22f, ui.theme.primary).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)))
+                r.addView(ui.text(icon, 22f, ui.ink).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)))
                 val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, 0, 0) }
                 tx.addView(ui.text(title, 16f, Colors.TEXT, bold = true))
                 tx.addView(ui.text(subtitle, 12.5f, Colors.MUTED))
@@ -297,9 +297,9 @@ class MainActivity : Activity() {
             current = m
             chips.forEachIndexed { i, c ->
                 val sel = i + 1 == m
-                c.setTextColor(if (sel) Color.WHITE else Colors.TEXT)
+                c.setTextColor(if (sel) ui.onFill else Colors.TEXT)
                 c.typeface = if (sel) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-                c.background = if (sel) ui.rounded(ui.theme.primary, 14) else ui.rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
+                c.background = if (sel) ui.rounded(ui.fill, 14) else ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
             }
             center(m, true)
         }
@@ -365,14 +365,14 @@ class MainActivity : Activity() {
         }
 
         // Duas
-        col.addView(ui.text("🤲 الأدعية والزيارات", 17f, ui.theme.primary, bold = true), ui.match(4, 14, 4, 4))
+        col.addView(ui.text("🤲 الأدعية والزيارات", 17f, ui.ink, bold = true), ui.match(4, 14, 4, 4))
         val duas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
         Duas.ALL.forEach { dua ->
             val hasAudio = hasAudio(dua)
-            duas.addView(ui.text((if (hasAudio) "🔊 " else "") + dua.title, 14f, ui.theme.primary, bold = true).apply {
+            duas.addView(ui.text((if (hasAudio) "🔊 " else "") + dua.title, 14f, ui.ink, bold = true).apply {
                 gravity = Gravity.CENTER
                 setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12))
-                background = ui.rounded(Color.WHITE, 14, Color.parseColor("#E3D6C2"), 1)
+                background = ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
                 setOnClickListener { showDua(dua) }
             }, ui.wrap(4, 0, 4, 0))
         }
@@ -383,7 +383,7 @@ class MainActivity : Activity() {
         })
 
         // Month occasions log
-        val logTitle = ui.text("", 17f, ui.theme.primary, bold = true)
+        val logTitle = ui.text("", 17f, ui.ink, bold = true)
         col.addView(logTitle, ui.match(4, 18, 4, 2))
         val logHost = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         lateinit var bar: MonthBar
@@ -403,8 +403,8 @@ class MainActivity : Activity() {
     private fun logRow(d: Day): View {
         val isToday = d.greg == LocalDate.now()
         val dark = d.isSorrow
-        val bg = when { dark -> Color.parseColor("#1E1E1E"); d.isJoy -> Color.parseColor("#FFF8D6"); isToday -> Color.parseColor("#FFF7E3"); else -> Color.WHITE }
-        val stroke = if (isToday) ui.theme.accent else if (dark) Color.parseColor("#3A3A3A") else Color.parseColor("#E8DFD0")
+        val bg = when { dark -> Color.parseColor("#1E1E1E"); d.isJoy -> Colors.JOY_SOFT; isToday -> Colors.TODAY_SOFT; else -> Colors.CARD }
+        val stroke = if (isToday) ui.theme.accent else if (dark) Color.parseColor("#3A3A3A") else Colors.STROKE
         val card = ui.row().apply {
             gravity = Gravity.TOP
             background = ui.rounded(bg, 16, stroke, if (isToday) 2 else 1)
@@ -418,7 +418,7 @@ class MainActivity : Activity() {
         val tag = when {
             dark -> "🏴 شهادة / وفاة" to Color.WHITE
             d.isJoy -> "🌸 مولد / فرح" to Color.parseColor("#9A7400")
-            d.mark.isNotBlank() -> "عقد النكاح: ${d.mark}" to (if (d.mark == "جيد") Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
+            d.mark.isNotBlank() -> "عقد النكاح: ${d.mark}" to (if (d.mark == "جيد") Colors.GOOD else Colors.BAD)
             else -> null
         }
         tag?.let { (s, c) -> top.addView(ui.text(s, 12.5f, c, bold = true)) }

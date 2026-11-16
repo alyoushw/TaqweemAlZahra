@@ -42,10 +42,21 @@ object WidgetPrefs {
         "uq" to "إظهار تاريخ أم القرى بجانب تاريخ الزهراء",
         "tale" to "إظهار طالع اليوم البرجي",
     )
+    val FONT_COLORS = listOf(
+        Triple("white", "أبيض", Color.WHITE),
+        Triple("gold", "ذهبي", Color.parseColor("#F3C94E")),
+        Triple("cream", "عاجي", Color.parseColor("#F5EBD7")),
+        Triple("silver", "فضي", Color.parseColor("#CFD8DC")),
+        Triple("mint", "أخضر فاتح", Color.parseColor("#A5D6A7")),
+        Triple("black", "أسود", Color.parseColor("#151515")),
+    )
     private val DEFAULT_ON = setOf("countdown", "times", "occasion")
     private fun sp(ctx: Context) = ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE)
     fun bg(ctx: Context) = sp(ctx).getString("widget_bg", "glass") ?: "glass"
     fun setBg(ctx: Context, id: String) = sp(ctx).edit().putString("widget_bg", id).apply()
+    fun font(ctx: Context) = sp(ctx).getString("widget_font", "white") ?: "white"
+    fun setFont(ctx: Context, id: String) = sp(ctx).edit().putString("widget_font", id).apply()
+    fun fontColor(ctx: Context) = (FONT_COLORS.firstOrNull { it.first == font(ctx) } ?: FONT_COLORS[0]).third
     fun on(ctx: Context, key: String) = sp(ctx).getBoolean("widget_$key", key in DEFAULT_ON)
     fun set(ctx: Context, key: String, v: Boolean) = sp(ctx).edit().putBoolean("widget_$key", v).apply()
 }
@@ -77,6 +88,12 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
             v.setInt(R.id.w_bg, "setColorFilter", bg.third or (0xFF shl 24))
             v.setInt(R.id.w_bg, "setImageAlpha", Color.alpha(bg.third))
 
+            val fc = WidgetPrefs.fontColor(ctx)
+            val soft = (fc and 0x00FFFFFF) or (0xCC shl 24)
+            listOf(R.id.w_title, R.id.w_hijri, R.id.w_next, R.id.w_timer, R.id.w_event, R.id.w_t1, R.id.w_t2, R.id.w_t3, R.id.w_t4, R.id.w_t5)
+                .forEach { v.setTextColor(it, fc) }
+            listOf(R.id.w_greg, R.id.w_extra).forEach { v.setTextColor(it, soft) }
+
             val day = CalendarData.byDate(ctx, LocalDate.now())
             val bar = size == WidgetSize.BAR
             val small = size == WidgetSize.SMALL
@@ -101,10 +118,17 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
                 if (day.isJoy) span.setSpan(ForegroundColorSpan(Colors.JOY), 0, day.zahra.toString().length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 v.setTextViewText(R.id.w_hijri, span)
 
-                val showOcc = WidgetPrefs.on(ctx, "occasion") && !bar && day.occasions.isNotEmpty()
+                val tomorrow = CalendarData.byDate(ctx, day.greg.plusDays(1))
+                val tonight = if (Prefs.occasionMode(ctx) == Prefs.OCC_BEFORE && tomorrow != null && Notifier.isReligious(tomorrow)) tomorrow else null
+                val showOcc = WidgetPrefs.on(ctx, "occasion") && !bar && (day.occasions.isNotEmpty() || tonight != null)
                 v.setViewVisibility(R.id.w_event, if (showOcc) View.VISIBLE else View.GONE)
-                v.setTextViewText(R.id.w_event, day.occasions.joinToString(" / ") { it.text })
-                v.setInt(R.id.w_event, "setMaxLines", if (large) 3 else if (small) 2 else 1)
+                val todayText = day.occasions.joinToString(" / ") { it.text }
+                v.setTextViewText(
+                    R.id.w_event,
+                    if (tonight == null) todayText
+                    else (if (todayText.isNotBlank()) "اليوم: $todayText\n" else "") + "الليلة: " + tonight.occasions.joinToString(" / ") { it.text },
+                )
+                v.setInt(R.id.w_event, "setMaxLines", if (large) 4 else if (small || tonight != null) 2 else 1)
 
                 val extras = buildList {
                     if (WidgetPrefs.on(ctx, "hijama")) {
@@ -125,7 +149,7 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
                 ).forEach { (id, lt) ->
                     val s = SpannableString("${lt.first}\n${lt.second}")
                     s.setSpan(RelativeSizeSpan(0.8f), 0, lt.first.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    s.setSpan(ForegroundColorSpan(Color.parseColor("#CCFFFFFF")), 0, lt.first.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    s.setSpan(ForegroundColorSpan(soft), 0, lt.first.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     v.setTextViewText(id, s)
                 }
             }
@@ -134,7 +158,7 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
             val showCount = WidgetPrefs.on(ctx, "countdown") && next != null
             v.setViewVisibility(R.id.w_count_row, if (showCount) View.VISIBLE else View.GONE)
             if (next != null) {
-                val label = if (next.prayer == Prayer.SUNRISE || next.prayer == Prayer.MIDNIGHT) next.prayer.label else "صلاة ${next.prayer.label}"
+                val label = "صلاة ${next.prayer.label}"
                 v.setTextViewText(R.id.w_next, "⏳ باقي على $label:")
                 val remaining = Duration.between(LocalDateTime.now(), next.at).toMillis()
                 v.setChronometer(R.id.w_timer, SystemClock.elapsedRealtime() + remaining, null, true)

@@ -135,9 +135,9 @@ object CalendarData {
 
     data class NextPrayer(val prayer: Prayer, val at: LocalDateTime)
 
-    /** The next fajr / sunrise / dhuhr / maghrib / midnight after [now], looking into tomorrow if needed. */
+    /** The next prayer (fajr / dhuhr / maghrib) after [now], looking into tomorrow if needed. */
     fun nextPrayer(ctx: Context, now: LocalDateTime = LocalDateTime.now()): NextPrayer? {
-        val order = listOf(Prayer.FAJR, Prayer.SUNRISE, Prayer.DHUHR, Prayer.MAGHRIB, Prayer.MIDNIGHT)
+        val order = listOf(Prayer.FAJR, Prayer.DHUHR, Prayer.MAGHRIB)
         for (offset in 0L..1L) {
             val date = now.toLocalDate().plusDays(offset)
             val day = byDate(ctx, date) ?: continue

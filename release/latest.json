@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "2.1.0",
+  "versionCode": 4,
+  "versionName": "2.2.0",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "تكبير وتصغير التقويم بإصبعين وتحريك سلس، ملء الشاشة بدون أشرطة الجوال، وفي التقويم الكامل يتحدد الشهر تلقائياً حسب الصفحة المعروضة."
+  "notes": "إشعار التحديث داخل التطبيق عند كل فتح، والتحديث يتنزل ويتثبت من داخل التطبيق مباشرة."
 }

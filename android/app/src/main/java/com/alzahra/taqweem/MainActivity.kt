@@ -57,6 +57,13 @@ class MainActivity : Activity() {
             setBackgroundColor(ui.theme.pageBg)
         }
         root.addView(header())
+        updateBanner = ui.text("", 15f, Color.parseColor("#2A1A00"), bold = true).apply {
+            gravity = Gravity.CENTER
+            setPadding(ui.dp(12), ui.dp(10), ui.dp(12), ui.dp(10))
+            setBackgroundColor(ui.theme.accent)
+            visibility = View.GONE
+        }
+        root.addView(updateBanner)
         content = FrameLayout(this)
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
@@ -65,7 +72,6 @@ class MainActivity : Activity() {
 
         if (savedInstanceState == null) {
             askNotificationPermission()
-            Updater.check(this, manual = false)
         }
         AlarmScheduler.scheduleNext(this)
         ZahraWidget.updateAll(this)
@@ -96,8 +102,19 @@ class MainActivity : Activity() {
         }
     }
 
+    private var updateBanner: TextView? = null
+
+    private fun showUpdateBanner(rel: Updater.Release) {
+        updateBanner?.apply {
+            text = "🔔 تحديث جديد متوفر (${rel.name}) — اضغط هنا للتحديث"
+            visibility = View.VISIBLE
+            setOnClickListener { Updater.install(this@MainActivity, rel) }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        Updater.check(this, manual = false) { showUpdateBanner(it) }
         if (tab == 1) selectTab(1)
     }
 
@@ -385,7 +402,7 @@ class MainActivity : Activity() {
         col.addView(ui.card().apply {
             addView(ui.title("التحديثات"))
             addView(ui.text("الإصدار الحالي: ${BuildConfig.VERSION_NAME}", 14f, Colors.TEXT))
-            addView(ui.primaryButton("التحقق من وجود تحديث") { Updater.check(this@MainActivity, manual = true) })
+            addView(ui.primaryButton("التحقق من وجود تحديث") { Updater.check(this@MainActivity, manual = true) { showUpdateBanner(it) } })
             addView(ui.outlineButton("مشاركة رابط تحميل التطبيق") {
                 startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"

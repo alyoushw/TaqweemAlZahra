@@ -68,6 +68,12 @@ object Notifier {
     fun showPrayer(ctx: Context, p: Prayer, time: String) {
         ensureChannels(ctx)
         val title = if (p == Prayer.IMSAK) "حان وقت الإمساك" else "حان الآن موعد ${p.label}"
+        // Fajr, dhuhr and maghrib play the chosen adhan voice in full.
+        val isAdhan = p == Prayer.FAJR || p == Prayer.DHUHR || p == Prayer.MAGHRIB
+        if (isAdhan && AdhanVoice.selected(ctx) != null) {
+            val ok = runCatching { AdhanService.start(ctx, "🕌 $title", "حسب توقيت الأحساء $time — تقويم الزهراء") }.isSuccess
+            if (ok) return
+        }
         val n = Notification.Builder(ctx, CH_ADHAN)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(title)

@@ -123,7 +123,34 @@ object Dialogs {
             col.addView(ui.toggle(label, Prefs.prayerOn(activity, p)) { on -> Prefs.setPrayerOn(activity, p, on); AlarmScheduler.scheduleNext(activity) })
         }
         col.addView(ui.toggle("إشعار مناسبة اليوم (٧ صباحاً)", Prefs.occasionOn(activity)) { on -> Prefs.setOccasionOn(activity, on); AlarmScheduler.scheduleNext(activity) })
-        col.addView(ui.text("صوت التنبيه حالياً نغمة المنبه في جوالك. أصوات الأذان الشيعي ستُضاف في التحديث القادم.", 12f, Colors.MUTED).apply { setPadding(0, ui.dp(6), 0, 0) })
+        col.addView(ui.text("🔊 صوت الأذان (الصبح والظهر والمغرب)", 16f, ui.theme.primary, bold = true), ui.match(0, 14, 0, 4))
+        val rows = ArrayList<Pair<String, android.widget.TextView>>()
+        fun paint() = rows.forEach { (id, v) ->
+            val sel = AdhanVoice.selectedId(activity) == id
+            v.text = (if (sel) "◉  " else "○  ") + v.tag as String
+            v.background = ui.rounded(if (sel) Color.parseColor("#FCE4EA") else Color.WHITE, 14, if (sel) ui.theme.primary else Color.parseColor("#E3D6C2"), if (sel) 2 else 1)
+        }
+        val choices = AdhanVoice.entries.map { it.id to it.title } + (AdhanVoice.SILENT to "إشعار فقط بدون صوت أذان")
+        choices.forEach { (id, title) ->
+            val r = ui.row()
+            val v = ui.text(title, 15f, Colors.TEXT, bold = true).apply {
+                tag = title
+                setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
+                setOnClickListener { AdhanVoice.select(activity, id); paint() }
+            }
+            rows += id to v
+            r.addView(v, ui.weight())
+            if (id != AdhanVoice.SILENT) {
+                r.addView(ui.text("▶", 18f, Color.WHITE, bold = true).apply {
+                    gravity = Gravity.CENTER
+                    background = ui.rounded(ui.theme.primary, 14)
+                    setOnClickListener { AdhanService.start(activity, "🔊 تجربة صوت الأذان", title, id) }
+                }, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply { setMargins(ui.dp(6), 0, 0, 0) })
+            }
+            col.addView(r, ui.match(0, 3, 0, 3))
+        }
+        paint()
+        col.addView(ui.outlineButton("⏹ إيقاف التجربة") { AdhanService.stop(activity) })
         col.addView(ui.outlineButton("فتح إعدادات الإشعارات في الجوال") {
             activity.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, activity.packageName))
         })

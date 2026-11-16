@@ -45,15 +45,48 @@
         </receiver>
 
         <receiver
-            android:name=".ZahraWidget"
+            android:name=".ZahraWidgetStandard"
             android:exported="true"
-            android:label="@string/widget_name">
+            android:label="تقويم الزهراء - القياسي">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
+                android:resource="@xml/widget_std" />
+        </receiver>
+        <receiver
+            android:name=".ZahraWidgetBar"
+            android:exported="true"
+            android:label="تقويم الزهراء - الشريطي">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_bar" />
+        </receiver>
+        <receiver
+            android:name=".ZahraWidgetSmall"
+            android:exported="true"
+            android:label="تقويم الزهراء - المصغر">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_small" />
+        </receiver>
+        <receiver
+            android:name=".ZahraWidgetLarge"
+            android:exported="true"
+            android:label="تقويم الزهراء - الموسع">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_large" />
         </receiver>
     </application>
 </manifest>

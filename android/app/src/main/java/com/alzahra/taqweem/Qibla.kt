@@ -307,6 +307,7 @@ object Qibla {
             web.destroy()
         }
         dialog.setContentView(root)
+        Immersive.padBottom(root)
         dialog.showImmersive()
     }
 }

@@ -62,7 +62,8 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setBackgroundColor(ui.theme.pageBg)
+            // Dark strip behind the phone's buttons (when shown), so they stay readable.
+            setBackgroundColor(ui.theme.primaryDark)
         }
         root.addView(header())
         updateBanner = ui.text("", 15f, Color.parseColor("#2A1A00"), bold = true).apply {
@@ -72,9 +73,10 @@ class MainActivity : Activity() {
             visibility = View.GONE
         }
         root.addView(updateBanner)
-        content = FrameLayout(this)
+        content = FrameLayout(this).apply { setBackgroundColor(ui.theme.pageBg) }
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
+        Immersive.padBottom(root)
         Immersive.apply(window)
         selectTab(tab)
 

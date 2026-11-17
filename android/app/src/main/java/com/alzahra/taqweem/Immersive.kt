@@ -26,9 +26,11 @@ object Immersive {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
+        // Pages always draw edge to edge; views that sit at the bottom add the buttons' height as padding (padBottom).
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
         if (Build.VERSION.SDK_INT >= 30) {
-            // With the buttons kept, the page stops above them instead of going underneath.
-            window.setDecorFitsSystemWindows(keepNav)
+            window.setDecorFitsSystemWindows(false)
             window.insetsController?.let {
                 if (keepNav) {
                     it.hide(WindowInsets.Type.statusBars())
@@ -37,16 +39,26 @@ object Immersive {
                 it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
-            window.decorView.systemUiVisibility = if (keepNav) (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
-            else (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
+            val base = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            window.decorView.systemUiVisibility = if (keepNav) base else base or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
         }
+        window.decorView.requestApplyInsets()
+    }
+
+    /**
+     * Keeps [view]'s content above the phone's navigation buttons when they are shown: its own background
+     * continues underneath them, and its bottom padding grows by their height.
+     */
+    @Suppress("DEPRECATION")
+    fun padBottom(view: View) {
+        val base = view.paddingBottom
+        view.setOnApplyWindowInsetsListener { v, ins ->
+            val b = if (Build.VERSION.SDK_INT >= 30) ins.getInsets(WindowInsets.Type.navigationBars()).bottom else ins.systemWindowInsetBottom
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, base + b)
+            ins
+        }
+        view.requestApplyInsets()
     }
 }
 

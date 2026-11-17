@@ -247,6 +247,7 @@ class AdhanActivity : Activity() {
             finish()
         }, ui.match(0, 0, 0, 0))
         setContentView(col)
+        Immersive.padBottom(col)
         Immersive.apply(window)
     }
 }

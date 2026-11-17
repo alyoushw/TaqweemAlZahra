@@ -33,11 +33,16 @@ class ReaderActivity : Activity() {
     private lateinit var titleView: TextView
     private lateinit var backView: TextView
     private lateinit var aaView: TextView
-    private var player: MediaPlayer? = null
+    /** The shared player (keeps playing in the background), when it belongs to this dua. */
+    private var player: MediaPlayer?
+        get() = if (DuaAudio.prayerId == item.id) DuaAudio.player else null
+        set(v) { if (v == null && DuaAudio.prayerId == item.id) DuaAudio.release(this) }
     private lateinit var item: Prayers.Item
     private var recs: List<Recitations.Rec> = emptyList()
     private var rec: Recitations.Rec? = null
-    private var prepared = false
+    private var prepared: Boolean
+        get() = DuaAudio.prayerId == item.id && DuaAudio.prepared
+        set(v) { if (DuaAudio.prayerId == item.id) DuaAudio.prepared = v }
     private val tick = android.os.Handler(android.os.Looper.getMainLooper())
     private var playBtn: TextView? = null
     private var reciterBtn: TextView? = null
@@ -110,6 +115,7 @@ class ReaderActivity : Activity() {
                     apply()
                     // Always open at the beginning of the dua.
                     view.evaluateJavascript("window.scrollTo(0,0)", null)
+                    syncPlayerUi() // a recitation already playing for this dua: show where it is
                 }
             }
         }
@@ -144,13 +150,15 @@ class ReaderActivity : Activity() {
         root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         recs = Recitations.forPrayer(this, item.id)
         if (recs.isNotEmpty()) {
-            rec = recs.firstOrNull { it.reciter == intent.getStringExtra(EXTRA_RECITER) } ?: Recitations.preferred(this, item.id)
-            root.addView(playerBar())
+            val playingHere = if (DuaAudio.prayerId == item.id) DuaAudio.reciter else null
+            rec = recs.firstOrNull { it.reciter == (playingHere ?: intent.getStringExtra(EXTRA_RECITER)) } ?: Recitations.preferred(this, item.id)
+            root.addView(playerBar().also { Immersive.padBottom(it) })
         }
+        if (recs.isEmpty()) Immersive.padBottom(root)
         setContentView(root)
         Immersive.apply(window)
         load()
-        if (intent.getStringExtra(EXTRA_RECITER) != null) web.postDelayed({ startPlayback() }, 400)
+        if (intent.getStringExtra(EXTRA_RECITER) != null && player == null) web.postDelayed({ startPlayback() }, 400)
     }
 
     // ---------------- reciter player ----------------
@@ -219,7 +227,7 @@ class ReaderActivity : Activity() {
 
     private fun releasePlayer() {
         tick.removeCallbacksAndMessages(null)
-        player?.release(); player = null; prepared = false
+        if (DuaAudio.prayerId == item.id) DuaAudio.release(this)
         playBtn?.text = "▶"; seekBar?.progress = 0; timeView?.text = "0:00"
         web.evaluateJavascript("hl(-1)", null); lastHl = -2
     }
@@ -228,10 +236,10 @@ class ReaderActivity : Activity() {
         val r = rec ?: return
         Recitations.remember(this, item.id, r.reciter)
         val p = player
-        if (p != null && prepared) { if (seekMs >= 0) p.seekTo(seekMs); p.start(); playBtn?.text = "⏸"; loop(); return }
+        if (p != null && prepared) { if (seekMs >= 0) p.seekTo(seekMs); p.start(); playBtn?.text = "⏸"; loop(); DuaAudio.update(this); return }
         if (p != null) return // still preparing
         playBtn?.text = "…"
-        player = MediaPlayer().apply {
+        DuaAudio.newPlayer(this, item.id, item.title, r.reciter, r.name).apply {
             setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
             setOnPreparedListener {
                 prepared = true
@@ -239,9 +247,9 @@ class ReaderActivity : Activity() {
                 // Skip any introduction: start where the dua itself begins (unless a phrase was tapped).
                 val introSkip = ((r.sync.firstOrNull()?.start ?: 0.0) - 0.4).coerceAtLeast(0.0)
                 it.seekTo(if (seekMs >= 0) seekMs else (introSkip * 1000).toInt())
-                it.start(); playBtn?.text = "⏸"; loop()
+                it.start(); playBtn?.text = "⏸"; loop(); DuaAudio.update(this@ReaderActivity)
             }
-            setOnCompletionListener { playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null) }
+            setOnCompletionListener { playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null); DuaAudio.update(this@ReaderActivity) }
             setOnErrorListener { _, _, _ ->
                 tryNextSource(r, seekMs, source); true
             }
@@ -259,7 +267,7 @@ class ReaderActivity : Activity() {
 
     private fun togglePlay() {
         val p = player
-        if (p != null && prepared && p.isPlaying) { p.pause(); playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null) }
+        if (p != null && prepared && p.isPlaying) { p.pause(); playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null); DuaAudio.update(this) }
         else startPlayback()
     }
 
@@ -297,14 +305,35 @@ class ReaderActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        player?.let { if (prepared && it.isPlaying) { it.pause(); playBtn?.text = "▶" } }
+        // The recitation keeps playing in the background; only the on-screen updates stop.
         tick.removeCallbacksAndMessages(null)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        syncPlayerUi()
+    }
+
+    /** Match the bar to the shared player (it may have been paused or stopped from the notification). */
+    private fun syncPlayerUi() {
+        if (playBtn == null) return
+        val p = player
+        if (p == null) {
+            playBtn?.text = "▶"; seekBar?.progress = 0; timeView?.text = "0:00"
+            if (lastHl != -2) { web.evaluateJavascript("hl(-1)", null); lastHl = -2 }
+            return
+        }
+        if (!prepared) { playBtn?.text = "…"; return }
+        seekBar?.max = p.duration
+        playBtn?.text = if (p.isPlaying) "⏸" else "▶"
+        lastHl = -2
+        loop()
     }
 
     override fun onDestroy() {
         tick.removeCallbacksAndMessages(null)
-        player?.release()
-        player = null
+        // Leaving the dua page («عودة» / back) ends its recitation.
+        if (isFinishing && DuaAudio.prayerId == item.id) DuaAudio.release(this)
         super.onDestroy()
     }
 
@@ -462,11 +491,13 @@ function setStyle(bg,fg,mu,sz,ff){var r=document.documentElement.style;r.setProp
             p != null -> { p.start(); btn.text = "⏸ إيقاف الصوت" }
             else -> runCatching {
                 val afd = assets.openFd("audio/${item.audio}")
-                player = MediaPlayer().apply {
+                DuaAudio.newPlayer(this, item.id, item.title, null, "").apply {
                     setDataSource(afd.fileDescriptor, afd.startOffset, afd.length); afd.close()
                     setOnCompletionListener { btn.text = "▶ استماع للدعاء" }
                     prepare(); start()
+                    DuaAudio.prepared = true
                 }
+                DuaAudio.update(this)
                 btn.text = "⏸ إيقاف الصوت"
             }.onFailure { Toast.makeText(this, "تعذر تشغيل الصوت", Toast.LENGTH_LONG).show() }
         }

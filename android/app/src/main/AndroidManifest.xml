@@ -43,6 +43,11 @@
             android:name=".InstallReceiver"
             android:exported="false" />
 
+        <activity
+            android:name=".ReaderActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <receiver
             android:name=".AlarmReceiver"
             android:exported="false" />

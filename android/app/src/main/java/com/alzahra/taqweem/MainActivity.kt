@@ -364,23 +364,21 @@ class MainActivity : Activity() {
             col.addView(card)
         }
 
-        // Duas
-        col.addView(ui.text("🤲 الأدعية والزيارات", 17f, ui.ink, bold = true), ui.match(4, 14, 4, 4))
-        val duas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-        Duas.ALL.forEach { dua ->
-            val hasAudio = hasAudio(dua)
-            duas.addView(ui.text((if (hasAudio) "🔊 " else "") + dua.title, 14f, ui.ink, bold = true).apply {
-                gravity = Gravity.CENTER
-                setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12))
-                background = ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
-                setOnClickListener { showDua(dua) }
-            }, ui.wrap(4, 0, 4, 0))
+        // Duas and ziyarat: two big buttons, each opens a list; a text opens on its own page.
+        val pr = ui.row().apply { setPadding(0, ui.dp(14), 0, 0) }
+        fun bigButton(icon: String, label: String, sub: String, onClick: () -> Unit) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = ui.rounded(Colors.CARD, 18, ui.theme.accent, 1)
+            setPadding(ui.dp(8), ui.dp(16), ui.dp(8), ui.dp(16))
+            addView(ui.text(icon, 28f, ui.ink).apply { gravity = Gravity.CENTER })
+            addView(ui.text(label, 17f, ui.ink, bold = true).apply { gravity = Gravity.CENTER })
+            addView(ui.text(sub, 12.5f, Colors.MUTED).apply { gravity = Gravity.CENTER })
+            setOnClickListener { onClick() }
         }
-        col.addView(HorizontalScrollView(this).apply {
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            isHorizontalScrollBarEnabled = false
-            addView(duas)
-        })
+        pr.addView(bigButton("🤲", "الأدعية", "${CalendarData.ar(Prayers.duas(this).size)} دعاء كامل") { prayerList("dua") }, ui.weight().apply { setMargins(0, 0, ui.dp(6), 0) })
+        pr.addView(bigButton("🕌", "الزيارات", "${CalendarData.ar(Prayers.ziyarat(this).size)} زيارات كاملة") { prayerList("ziyarat") }, ui.weight().apply { setMargins(ui.dp(6), 0, 0, 0) })
+        col.addView(pr)
 
         // Month occasions log
         val logTitle = ui.text("", 17f, ui.ink, bold = true)
@@ -439,29 +437,20 @@ class MainActivity : Activity() {
         return wrap
     }
 
-    private fun hasAudio(dua: Dua) = runCatching { assets.list("audio")?.contains(dua.audio) == true }.getOrDefault(false)
-
-    private fun showDua(dua: Dua) {
-        Dialogs.sheet(this, "🤲", dua.title, null) { col, dialog ->
-            val audio = hasAudio(dua)
-            val play = ui.primaryButton(if (audio) "▶ تشغيل الصوت" else "🔇 الصوت سيضاف في تحديث قادم") {}
-            if (audio) play.setOnClickListener {
-                val pl = player
-                if (pl != null && pl.isPlaying) { pl.pause(); play.text = "▶ تشغيل الصوت" }
-                else if (pl != null) { pl.start(); play.text = "⏸ إيقاف مؤقت" }
-                else runCatching {
-                    val afd = assets.openFd("audio/${dua.audio}")
-                    player = MediaPlayer().apply {
-                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length); afd.close()
-                        setOnCompletionListener { play.text = "▶ تشغيل الصوت" }
-                        prepare(); start()
-                    }
-                    play.text = "⏸ إيقاف مؤقت"
-                }.onFailure { Toast.makeText(this, "تعذر تشغيل الصوت", Toast.LENGTH_LONG).show() }
+    private fun prayerList(kind: String) {
+        val items = if (kind == "dua") Prayers.duas(this) else Prayers.ziyarat(this)
+        Dialogs.sheet(this, if (kind == "dua") "🤲" else "🕌", if (kind == "dua") "الأدعية" else "الزيارات", "النص الكامل من مفاتيح الجنان") { col, dialog ->
+            items.forEach { item ->
+                val r = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    background = ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
+                    setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12))
+                    setOnClickListener { dialog.dismiss(); ReaderActivity.open(this@MainActivity, item.id) }
+                }
+                r.addView(ui.text(item.title, 17f, ui.ink, bold = true))
+                if (item.subtitle.isNotBlank()) r.addView(ui.text(item.subtitle, 13f, Colors.MUTED))
+                col.addView(r, ui.match(0, 4, 0, 4))
             }
-            col.addView(play)
-            col.addView(ui.text(dua.text, 21f, Colors.TEXT).apply { typeface = Typeface.SERIF; setLineSpacing(0f, 1.6f); setPadding(0, ui.dp(8), 0, 0) })
-            dialog.setOnDismissListener { player?.release(); player = null }
         }
     }
 

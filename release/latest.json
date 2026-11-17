@@ -1,6 +1,6 @@
 {
-  "versionCode": 10,
-  "versionName": "3.4.1",
+  "versionCode": 11,
+  "versionName": "3.5.0",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "في الإشعارات والأذان: صار يظهر لك المناسبة الدينية القادمة وموعد تذكيرها، مع زر «تجربة إشعار المناسبة الآن» للتأكد."
+  "notes": "الأدعية والزيارات بنصها الكامل من مفاتيح الجنان (١٤ دعاء و٩ زيارات)، تُفتح في صفحة كاملة للقراءة مع تكبير وتصغير الخط وتغيير لون الخط والخلفية، ويحفظ مكان توقفك."
 }

@@ -58,6 +58,8 @@ class AdhanService : Service() {
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         else startForeground(NOTIF_ID, n)
 
+        if (prayer != null) PrayerAlert.launchScreen(this, prayer, ptime, false)
+
         player?.release()
         if (voice == null) { stopAll(); return START_NOT_STICKY }
         player = runCatching {

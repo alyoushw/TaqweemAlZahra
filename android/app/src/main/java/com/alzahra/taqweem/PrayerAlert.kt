@@ -46,6 +46,27 @@ object PrayerAlert {
     fun canFullScreen(ctx: Context): Boolean =
         Build.VERSION.SDK_INT < 34 || ctx.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
 
+    /** «Display over other apps»: lets the adhan page open on top of whatever app is in use. */
+    fun canOverlay(ctx: Context) = Settings.canDrawOverlays(ctx)
+
+    fun openOverlaySettings(activity: Activity) {
+        runCatching {
+            activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${activity.packageName}")))
+        }
+    }
+
+    /** Opens the full-screen adhan page right away (like an alarm clock), when enabled and allowed. */
+    fun launchScreen(ctx: Context, p: Prayer, time: String, snoozed: Boolean) {
+        if (!fullScreenOn(ctx)) return
+        runCatching {
+            ctx.startActivity(
+                Intent(ctx, AdhanActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+                    .putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_SNOOZED, snoozed),
+            )
+        }
+    }
+
     fun openFullScreenSettings(activity: Activity) {
         if (Build.VERSION.SDK_INT >= 34) {
             runCatching {
@@ -133,6 +154,7 @@ object PrayerAlert {
             .addAction(Notification.Action.Builder(null, "⏰ تأجيل ١٠ دقائق", actionIntent(ctx, ACTION_SNOOZE, p, time, 35)).build())
         if (fullScreenOn(ctx)) b.setFullScreenIntent(screenIntent(ctx, p, time, true), true)
         ctx.getSystemService(NotificationManager::class.java).notify(NOTIF_ID + 2, b.build())
+        launchScreen(ctx, p, time, true)
     }
 
     fun clear(ctx: Context) {
@@ -173,6 +195,10 @@ class AdhanActivity : Activity() {
         super.onNewIntent(intent)
         render(intent)
     }
+
+    /** Like an alarm clock: the page closes only with «إيقاف» or «تأجيل». */
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {}
 
     private fun render(i: Intent) {
         val ui = Ui(this)

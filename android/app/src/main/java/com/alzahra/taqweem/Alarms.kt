@@ -82,6 +82,7 @@ object Notifier {
         // No adhan voice: same alert (stop / snooze / full screen) with the channel's sound.
         val n = PrayerAlert.prayerNotification(ctx, CH_ADHAN, p, time, ongoing = false)
         ctx.getSystemService(NotificationManager::class.java).notify(100 + p.ordinal, n)
+        PrayerAlert.launchScreen(ctx, p, time, false)
     }
 
     /** Births and martyrdoms — the days the calendar marks yellow or black. */

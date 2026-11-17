@@ -122,15 +122,36 @@ object Dialogs {
         val today = CalendarData.byDate(activity, java.time.LocalDate.now())
         // Full-screen adhan (first option).
         val fsCard = ui.card(Colors.SOFT, ui.theme.accent)
+        val fsStatus = ui.text("", 13f, Colors.TEXT, bold = true)
+        fun paintStatus() {
+            val on = PrayerAlert.fullScreenOn(activity)
+            val ok = PrayerAlert.canOverlay(activity)
+            fsStatus.text = when {
+                !on -> ""
+                ok -> "✓ إذن «الظهور فوق التطبيقات» مفعّل — سيغطي الأذان الشاشة دائماً"
+                else -> "⚠ يلزم تفعيل إذن «الظهور فوق التطبيقات» — اضغط هنا"
+            }
+            fsStatus.setTextColor(if (ok) Colors.GOOD else Colors.BAD)
+            fsStatus.visibility = if (on) View.VISIBLE else View.GONE
+        }
+        fsStatus.setOnClickListener { PrayerAlert.openOverlaySettings(activity) }
         val fsSwitch = ui.toggle("📱 الواجهة الكاملة للأذان", PrayerAlert.fullScreenOn(activity)) { on ->
             PrayerAlert.setFullScreen(activity, on)
-            if (on && !PrayerAlert.canFullScreen(activity)) {
-                Toast.makeText(activity, "اسمح للتطبيق بعرض الإشعارات بملء الشاشة", Toast.LENGTH_LONG).show()
-                PrayerAlert.openFullScreenSettings(activity)
+            if (on && !PrayerAlert.canOverlay(activity)) {
+                android.app.AlertDialog.Builder(activity)
+                    .setTitle("السماح بالظهور فوق التطبيقات")
+                    .setMessage("حتى يظهر الأذان كشاشة كاملة مثل المنبّه وأنت تستخدم الجوال، فعّل لتطبيق «تقويم الزهراء» خيار «السماح بالظهور فوق التطبيقات الأخرى» ثم ارجع.")
+                    .setPositiveButton("فتح الإعدادات") { _, _ -> PrayerAlert.openOverlaySettings(activity) }
+                    .setNegativeButton("لاحقاً", null)
+                    .show()
             }
+            if (on && !PrayerAlert.canFullScreen(activity)) PrayerAlert.openFullScreenSettings(activity)
+            paintStatus()
         }
         fsCard.addView(fsSwitch)
-        fsCard.addView(ui.text("عند دخول وقت الصلاة يظهر الأذان كشاشة كاملة (حتى والجوال مقفل) مع زرّي «إيقاف» و«تأجيل ١٠ دقائق» بدلاً من إشعار صغير.", 12.5f, Colors.MUTED))
+        fsCard.addView(ui.text("عند دخول وقت الصلاة يغطي الأذان شاشة الجوال كاملة مثل المنبّه (حتى وأنت تستخدم الجوال)، ولا يُغلق إلا بزر «إيقاف» أو «تأجيل ١٠ دقائق».", 12.5f, Colors.MUTED))
+        fsCard.addView(fsStatus)
+        paintStatus()
         col.addView(fsCard)
         col.addView(ui.primaryButton("🔔 تجربة أذان الصلاة الآن") {
             Notifier.showPrayer(activity, Prayer.DHUHR, today?.times?.dhuhr ?: "")

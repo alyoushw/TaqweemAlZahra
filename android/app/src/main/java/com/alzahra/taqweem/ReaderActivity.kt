@@ -108,8 +108,8 @@ class ReaderActivity : Activity() {
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String?) {
                     apply()
-                    val y = sp().getInt("reader_pos_${item.id}", 0)
-                    if (y > 0) view.postDelayed({ view.evaluateJavascript("window.scrollTo(0,$y)", null) }, 150)
+                    // Always open at the beginning of the dua.
+                    view.evaluateJavascript("window.scrollTo(0,0)", null)
                 }
             }
         }
@@ -281,7 +281,6 @@ class ReaderActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        web.evaluateJavascript("window.scrollY") { v -> v?.toDoubleOrNull()?.toInt()?.let { sp().edit().putInt("reader_pos_${item.id}", it).apply() } }
         player?.let { if (prepared && it.isPlaying) { it.pause(); playBtn?.text = "▶" } }
         tick.removeCallbacksAndMessages(null)
     }

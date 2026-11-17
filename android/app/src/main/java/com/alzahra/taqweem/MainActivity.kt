@@ -252,6 +252,27 @@ class MainActivity : Activity() {
             group("المظهر والشاشة الرئيسية")
             row("🎨", "مظهر التطبيق", "اختيار اللون: ${ui.theme.title}") { Dialogs.theme(this) { recreate() } }
             row("▦", "ودجت الشاشة الرئيسية", "المقاس والألوان والمحتوى") { Dialogs.widgetSettings(this) }
+            // Keep the phone's navigation buttons visible (full screen hides them by default).
+            val nr = ui.row().apply {
+                setPadding(ui.dp(14), ui.dp(10), ui.dp(10), ui.dp(10))
+                background = ui.rounded(Colors.CARD, 16, Colors.STROKE, 1)
+            }
+            nr.addView(ui.text("📱", 22f, ui.ink).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)))
+            val nt = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, 0, 0) }
+            nt.addView(ui.text("إظهار أزرار الجوال", 15.5f, Colors.TEXT, bold = true))
+            nt.addView(ui.text("أزرار التنقل أسفل الشاشة تبقى ظاهرة داخل التطبيق", 12.5f, Colors.MUTED))
+            nr.addView(nt, ui.weight())
+            val nsw = android.widget.Switch(this)
+            nr.setOnClickListener { nsw.toggle() }
+            nr.addView(nsw.apply {
+                isChecked = Immersive.showNav(this@MainActivity)
+                setOnCheckedChangeListener { _, on ->
+                    Immersive.setShowNav(this@MainActivity, on)
+                    Immersive.apply(window)
+                    dialog.window?.let { Immersive.apply(it) }
+                }
+            })
+            col.addView(nr, ui.match(0, 4, 0, 4))
             group("الصلاة")
             // Fajr precaution toggle with an info button.
             val fr = ui.row().apply {

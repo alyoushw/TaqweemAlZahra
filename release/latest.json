@@ -1,6 +1,6 @@
 {
-  "versionCode": 18,
-  "versionName": "3.9.2",
+  "versionCode": 19,
+  "versionName": "3.9.3",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "زر الكعبة بجانب «اليوم» في الصفحة الرئيسية يفتح اتجاه القبلة مباشرة. ومجسّم الكعبة على البوصلة بدل العلامة الدائرية، ويتلوّن حدّه بالأخضر عند مواجهة القبلة."
+  "notes": "خيار جديد في الإعدادات ⚙: «إظهار أزرار الجوال» لإبقاء أزرار التنقل أسفل الشاشة ظاهرة داخل التطبيق."
 }

@@ -1,6 +1,6 @@
 {
-  "versionCode": 20,
-  "versionName": "3.9.4",
+  "versionCode": 21,
+  "versionName": "3.9.5",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "إصلاح توقف التطبيق عند تفعيل تأخير صلاة الفجر في الجوالات اللي لغتها عربي. وإصلاح عرض صفحات التقويم الكامل في هذه الجوالات."
+  "notes": "الدعاء يضل شغال لو طلعت من التطبيق أو طفّيت الشاشة، مع إشعار فيه إيقاف مؤقت وإنهاء. وشريط الصوت صار فوق أزرار الجوال ولونه يمتد تحتها."
 }

@@ -50,7 +50,11 @@ class AdhanService : Service() {
         val voice = AdhanVoice.entries.firstOrNull { it.id == intent?.getStringExtra(EXTRA_VOICE) } ?: AdhanVoice.selected(this)
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "حان وقت الصلاة"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
-        val n = notification(title, text)
+        val prayer = intent?.getStringExtra(EXTRA_PRAYER)?.let { runCatching { Prayer.valueOf(it) }.getOrNull() }
+        val ptime = intent?.getStringExtra(EXTRA_PTIME) ?: ""
+        // A real prayer gets the stop/snooze notification (and full screen if enabled); a voice test keeps the simple one.
+        ensureChannel(this)
+        val n = if (prayer != null) PrayerAlert.prayerNotification(this, CHANNEL, prayer, ptime, ongoing = true) else notification(title, text)
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         else startForeground(NOTIF_ID, n)
 
@@ -113,6 +117,8 @@ class AdhanService : Service() {
         const val EXTRA_VOICE = "voice"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_PRAYER = "prayer_name"
+        const val EXTRA_PTIME = "prayer_time"
 
         /** Silent channel: the service plays the sound itself. */
         fun ensureChannel(ctx: Context) {
@@ -126,9 +132,10 @@ class AdhanService : Service() {
             }
         }
 
-        fun start(ctx: Context, title: String, text: String, voiceId: String? = null) {
+        fun start(ctx: Context, title: String, text: String, voiceId: String? = null, prayer: Prayer? = null, time: String = "") {
             val i = Intent(ctx, AdhanService::class.java)
                 .putExtra(EXTRA_TITLE, title).putExtra(EXTRA_TEXT, text)
+            if (prayer != null) i.putExtra(EXTRA_PRAYER, prayer.name).putExtra(EXTRA_PTIME, time)
             if (voiceId != null) i.putExtra(EXTRA_VOICE, voiceId)
             if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
         }

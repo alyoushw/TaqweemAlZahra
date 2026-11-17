@@ -76,17 +76,11 @@ object Notifier {
         // Fajr, dhuhr and maghrib play the chosen adhan voice in full.
         val isAdhan = p == Prayer.FAJR || p == Prayer.DHUHR || p == Prayer.MAGHRIB
         if (isAdhan && AdhanVoice.selected(ctx) != null) {
-            val ok = runCatching { AdhanService.start(ctx, "🕌 $title", "حسب توقيت الأحساء $time — تقويم الزهراء") }.isSuccess
+            val ok = runCatching { AdhanService.start(ctx, "🕌 $title", "حسب توقيت الأحساء $time — تقويم الزهراء", prayer = p, time = time) }.isSuccess
             if (ok) return
         }
-        val n = Notification.Builder(ctx, CH_ADHAN)
-            .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle(title)
-            .setContentText("حسب توقيت الأحساء $time — تقويم الزهراء")
-            .setCategory(Notification.CATEGORY_ALARM)
-            .setAutoCancel(true)
-            .setContentIntent(openApp(ctx))
-            .build()
+        // No adhan voice: same alert (stop / snooze / full screen) with the channel's sound.
+        val n = PrayerAlert.prayerNotification(ctx, CH_ADHAN, p, time, ongoing = false)
         ctx.getSystemService(NotificationManager::class.java).notify(100 + p.ordinal, n)
     }
 

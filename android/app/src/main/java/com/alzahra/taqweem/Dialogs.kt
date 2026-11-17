@@ -120,8 +120,20 @@ object Dialogs {
     fun notificationSettings(activity: Activity, col: LinearLayout) {
         val ui = Ui(activity)
         val today = CalendarData.byDate(activity, java.time.LocalDate.now())
-        col.addView(ui.primaryButton("🔔 تجربة وفحص الإشعار الخارجي الآن") {
-            Notifier.showPrayer(activity, Prayer.FAJR, "تجربة")
+        // Full-screen adhan (first option).
+        val fsCard = ui.card(Colors.SOFT, ui.theme.accent)
+        val fsSwitch = ui.toggle("📱 الواجهة الكاملة للأذان", PrayerAlert.fullScreenOn(activity)) { on ->
+            PrayerAlert.setFullScreen(activity, on)
+            if (on && !PrayerAlert.canFullScreen(activity)) {
+                Toast.makeText(activity, "اسمح للتطبيق بعرض الإشعارات بملء الشاشة", Toast.LENGTH_LONG).show()
+                PrayerAlert.openFullScreenSettings(activity)
+            }
+        }
+        fsCard.addView(fsSwitch)
+        fsCard.addView(ui.text("عند دخول وقت الصلاة يظهر الأذان كشاشة كاملة (حتى والجوال مقفل) مع زرّي «إيقاف» و«تأجيل ١٠ دقائق» بدلاً من إشعار صغير.", 12.5f, Colors.MUTED))
+        col.addView(fsCard)
+        col.addView(ui.primaryButton("🔔 تجربة أذان الصلاة الآن") {
+            Notifier.showPrayer(activity, Prayer.DHUHR, today?.times?.dhuhr ?: "")
         })
         listOf(Prayer.FAJR, Prayer.DHUHR, Prayer.MAGHRIB, Prayer.IMSAK, Prayer.SUNRISE, Prayer.MIDNIGHT).forEach { p ->
             val time = today?.let { d ->

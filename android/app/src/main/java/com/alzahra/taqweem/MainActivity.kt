@@ -168,6 +168,11 @@ class MainActivity : Activity() {
             background = ui.rounded(t.accent, 12)
             setOnClickListener { goToday() }
         }, ui.wrap(0, 0, 8, 0))
+        r1.addView(KaabaButton(this, t.accent).apply {
+            background = ui.rounded(Color.parseColor("#33FFFFFF"), 12)
+            contentDescription = "اتجاه القبلة"
+            setOnClickListener { Qibla.show(this@MainActivity) }
+        }, LinearLayout.LayoutParams(ui.dp(42), ui.dp(42)).apply { marginEnd = ui.dp(8) })
         r1.addView(ui.text("⚙", 24f, Color.WHITE, bold = true).apply {
             gravity = Gravity.CENTER
             background = ui.rounded(Color.parseColor("#33FFFFFF"), 12)

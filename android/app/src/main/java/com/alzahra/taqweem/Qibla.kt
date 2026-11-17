@@ -333,14 +333,7 @@ class CompassView(ctx: Context, private val primary: Int, private val gold: Int)
         }
     }
 
-    private fun kaaba(c: Canvas, x: Float, y: Float, s: Float, ring: Int) {
-        p.style = Paint.Style.FILL; p.color = Color.parseColor("#111111")
-        c.drawCircle(x, y, s, p)
-        p.style = Paint.Style.STROKE; p.strokeWidth = s * 0.16f; p.color = ring
-        c.drawCircle(x, y, s, p)
-        p.style = Paint.Style.FILL; p.color = gold
-        c.drawRect(x - s * 0.5f, y - s * 0.22f, x + s * 0.5f, y - s * 0.05f, p)
-    }
+    private fun kaaba(c: Canvas, x: Float, y: Float, s: Float, ring: Int) = KaabaIcon.draw(c, x, y, s * 1.25f, ring, gold)
 
     private fun drawClassic(c: Canvas, cx: Float, cy: Float, r: Float, h: Float) {
         p.style = Paint.Style.FILL; p.color = Color.parseColor("#FFFCF5")
@@ -412,4 +405,35 @@ class CompassView(ctx: Context, private val primary: Int, private val gold: Int)
         p.color = gold; c.drawRect(cx - r * 0.13f, cy + r * 0.11f, cx + r * 0.13f, cy + r * 0.15f, p)
         c.restore()
     }
+}
+
+/** The Kaaba drawn as a small 3D cube: black walls, gold kiswa band. Used on the compass and the header button. */
+object KaabaIcon {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val path = Path()
+
+    /** @param s half the icon's height; @param outline edge colour (green when facing the qibla). */
+    fun draw(c: Canvas, x: Float, y: Float, s: Float, outline: Int, gold: Int) {
+        val k = s / 12f
+        fun poly(vararg pts: Float) {
+            path.reset(); path.moveTo(x + pts[0] * k, y + pts[1] * k)
+            var i = 2
+            while (i < pts.size) { path.lineTo(x + pts[i] * k, y + pts[i + 1] * k); i += 2 }
+            path.close()
+        }
+        p.style = Paint.Style.FILL
+        poly(0f, -11f, 12f, -6f, 12f, 8f, 0f, 12f, -12f, 8f, -12f, -6f); p.color = Color.parseColor("#141414"); c.drawPath(path, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 1.6f * k; p.strokeJoin = Paint.Join.ROUND; p.color = outline; c.drawPath(path, p)
+        p.style = Paint.Style.FILL
+        poly(0f, -11f, 12f, -6f, 0f, -2f, -12f, -6f); p.color = Color.parseColor("#2C2C2C"); c.drawPath(path, p)
+        poly(-12f, -2.5f, 0f, 1.5f, 12f, -2.5f, 12f, 0.5f, 0f, 4.5f, -12f, 0.5f); p.color = gold; c.drawPath(path, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 0.8f * k; p.color = Color.parseColor("#55FFFFFF")
+        c.drawLine(x, y - 2f * k, x, y + 12f * k, p)
+        c.drawLine(x - 12f * k, y - 6f * k, x, y - 2f * k, p); c.drawLine(x, y - 2f * k, x + 12f * k, y - 6f * k, p)
+    }
+}
+
+/** Header button showing the Kaaba. */
+class KaabaButton(ctx: Context, private val gold: Int) : View(ctx) {
+    override fun onDraw(c: Canvas) = KaabaIcon.draw(c, width / 2f, height / 2f, min(width, height) * 0.3f, Color.parseColor("#66FFFFFF"), gold)
 }

@@ -35,6 +35,15 @@ class ReaderActivity : Activity() {
     private lateinit var aaView: TextView
     private var player: MediaPlayer? = null
     private lateinit var item: Prayers.Item
+    private var recs: List<Recitations.Rec> = emptyList()
+    private var rec: Recitations.Rec? = null
+    private var prepared = false
+    private val tick = android.os.Handler(android.os.Looper.getMainLooper())
+    private var playBtn: TextView? = null
+    private var reciterBtn: TextView? = null
+    private var timeView: TextView? = null
+    private var seekBar: android.widget.SeekBar? = null
+    private var lastHl = -2
 
     private fun sp() = getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE)
     private var size: Int
@@ -120,10 +129,147 @@ class ReaderActivity : Activity() {
             // While two fingers are down, keep the page still so only the text size changes.
             ev.pointerCount > 1 || pinch.isInProgress
         }
+        web.addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface fun seek(line: Int) { runOnUiThread { seekToLine(line) } }
+        }, "Z")
         root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        recs = Recitations.forPrayer(this, item.id)
+        if (recs.isNotEmpty()) {
+            rec = recs.firstOrNull { it.reciter == intent.getStringExtra(EXTRA_RECITER) } ?: Recitations.preferred(this, item.id)
+            root.addView(playerBar())
+        }
         setContentView(root)
         Immersive.apply(window)
         load()
+        if (intent.getStringExtra(EXTRA_RECITER) != null) web.postDelayed({ startPlayback() }, 400)
+    }
+
+    // ---------------- reciter player ----------------
+
+    private fun playerBar(): View {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setBackgroundColor(ui.theme.primaryDark)
+            setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(10))
+        }
+        val row = ui.row()
+        playBtn = ui.text("▶", 22f, Color.parseColor("#2A1A00"), bold = true).apply {
+            gravity = Gravity.CENTER
+            background = ui.rounded(ui.theme.accent, 26)
+            setOnClickListener { togglePlay() }
+        }
+        row.addView(playBtn, LinearLayout.LayoutParams(ui.dp(52), ui.dp(52)))
+        val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, ui.dp(8), 0) }
+        info.addView(ui.text("القارئ", 11.5f, Color.parseColor("#B3FFFFFF")))
+        reciterBtn = ui.text(rec?.name ?: "", 16f, Color.WHITE, bold = true).apply { maxLines = 1 }
+        info.addView(reciterBtn)
+        row.addView(info, ui.weight())
+        row.addView(ui.text("🎙 اختر القارئ", 14f, ui.theme.accent, bold = true).apply {
+            gravity = Gravity.CENTER
+            setPadding(ui.dp(12), ui.dp(9), ui.dp(12), ui.dp(9))
+            background = ui.rounded(Color.parseColor("#26FFFFFF"), 14, ui.theme.accent, 1)
+            setOnClickListener { chooseReciter() }
+        })
+        bar.addView(row)
+        val prog = ui.row().apply { setPadding(0, ui.dp(6), 0, 0) }
+        timeView = ui.text("0:00", 12f, Color.parseColor("#CCFFFFFF"))
+        seekBar = android.widget.SeekBar(this).apply {
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: android.widget.SeekBar, v: Int, fromUser: Boolean) { if (fromUser && prepared) player?.seekTo(v) }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+            })
+        }
+        prog.addView(timeView, ui.wrap())
+        prog.addView(seekBar, ui.weight())
+        bar.addView(prog)
+        return bar
+    }
+
+    private fun fmt(ms: Int): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
+
+    private fun chooseReciter() {
+        Dialogs.sheet(this, "🎙", "اختر القارئ", item.title) { col, dialog ->
+            recs.forEach { r ->
+                val sel = r.reciter == rec?.reciter
+                col.addView(ui.text((if (sel) "◉  " else "○  ") + r.name, 17f, Colors.TEXT, bold = true).apply {
+                    setPadding(ui.dp(16), ui.dp(14), ui.dp(16), ui.dp(14))
+                    background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
+                    setOnClickListener {
+                        dialog.dismiss()
+                        if (r.reciter != rec?.reciter) { rec = r; reciterBtn?.text = r.name; releasePlayer() }
+                        startPlayback()
+                    }
+                }, ui.match(0, 4, 0, 4))
+            }
+            col.addView(ui.text("التلاوة تُشغَّل عبر الإنترنت، ويتم تظليل العبارة التي يقرؤها القارئ. اضغط على أي عبارة للانتقال إليها.", 12.5f, Colors.MUTED).apply { setPadding(0, ui.dp(8), 0, 0) })
+        }
+    }
+
+    private fun releasePlayer() {
+        tick.removeCallbacksAndMessages(null)
+        player?.release(); player = null; prepared = false
+        playBtn?.text = "▶"; seekBar?.progress = 0; timeView?.text = "0:00"
+        web.evaluateJavascript("hl(-1)", null); lastHl = -2
+    }
+
+    private fun startPlayback(seekMs: Int = -1) {
+        val r = rec ?: return
+        Recitations.remember(this, item.id, r.reciter)
+        val p = player
+        if (p != null && prepared) { if (seekMs >= 0) p.seekTo(seekMs); p.start(); playBtn?.text = "⏸"; loop(); return }
+        if (p != null) return // still preparing
+        playBtn?.text = "…"
+        player = MediaPlayer().apply {
+            setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            setOnPreparedListener {
+                prepared = true
+                seekBar?.max = it.duration
+                if (seekMs >= 0) it.seekTo(seekMs)
+                it.start(); playBtn?.text = "⏸"; loop()
+            }
+            setOnCompletionListener { playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null) }
+            setOnErrorListener { _, _, _ ->
+                Toast.makeText(this@ReaderActivity, "تعذر تشغيل التلاوة — تأكد من اتصال الإنترنت", Toast.LENGTH_LONG).show()
+                releasePlayer(); true
+            }
+            runCatching { setDataSource(r.url); prepareAsync() }.onFailure { releasePlayer() }
+        }
+    }
+
+    private fun togglePlay() {
+        val p = player
+        if (p != null && prepared && p.isPlaying) { p.pause(); playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null) }
+        else startPlayback()
+    }
+
+    private fun seekToLine(line: Int) {
+        val r = rec ?: return
+        val seg = r.sync.firstOrNull { it.line == line } ?: return
+        val ms = (seg.start * 1000).toInt()
+        if (player != null && prepared) { player?.seekTo(ms); if (player?.isPlaying != true) startPlayback() }
+        else startPlayback(ms)
+    }
+
+    /** Every 100 ms: highlight the phrase being recited and move the progress bar. */
+    private fun loop() {
+        tick.removeCallbacksAndMessages(null)
+        tick.post(object : Runnable {
+            override fun run() {
+                val p = player ?: return
+                if (!prepared) return
+                val ms = p.currentPosition
+                seekBar?.progress = ms; timeView?.text = fmt(ms)
+                rec?.let { r ->
+                    val k = Recitations.current(r, ms / 1000.0)
+                    val line = if (k >= 0) r.sync[k].line else -1
+                    if (line != lastHl) { lastHl = line; web.evaluateJavascript("hl($line)", null) }
+                }
+                if (p.isPlaying) tick.postDelayed(this, 100)
+            }
+        })
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -134,10 +280,12 @@ class ReaderActivity : Activity() {
     override fun onPause() {
         super.onPause()
         web.evaluateJavascript("window.scrollY") { v -> v?.toDoubleOrNull()?.toInt()?.let { sp().edit().putInt("reader_pos_${item.id}", it).apply() } }
-        player?.pause()
+        player?.let { if (prepared && it.isPlaying) { it.pause(); playBtn?.text = "▶" } }
+        tick.removeCallbacksAndMessages(null)
     }
 
     override fun onDestroy() {
+        tick.removeCallbacksAndMessages(null)
         player?.release()
         player = null
         super.onDestroy()
@@ -157,13 +305,19 @@ class ReaderActivity : Activity() {
     private fun paragraphs(): String {
         val out = StringBuilder()
         val cur = ArrayList<String>()
+        val curIdx = ArrayList<Int>()
         fun flush() {
             if (cur.isEmpty()) return
-            val txt = cur.joinToString("\u00A0، ") { it.trim().trimEnd('،', ',', '.', '؛', ' ') } + "\u00A0."
-            out.append("<p class='ar'>").append(esc(txt)).append("</p>")
-            cur.clear()
+            out.append("<p class='ar'>")
+            cur.forEachIndexed { k, t ->
+                val clean = esc(t.trim().trimEnd('،', ',', '.', '؛', ' '))
+                out.append("<span class='ph' id='l${curIdx[k]}' onclick='Z.seek(${curIdx[k]})'>").append(clean).append("</span>")
+                out.append(if (k < cur.size - 1) "\u00A0، " else "\u00A0.")
+            }
+            out.append("</p>")
+            cur.clear(); curIdx.clear()
         }
-        for (l in item.lines) {
+        for ((li, l) in item.lines.withIndex()) {
             when {
                 l.isHeading -> { flush(); out.append(if (l.text == "❖") "<div class='sep'>❖</div>" else "<h3>${esc(l.text)}</h3>") }
                 l.isNote -> { flush(); out.append("<p class='note'>${esc(l.text)}</p>") }
@@ -171,7 +325,7 @@ class ReaderActivity : Activity() {
                     val len = cur.sumOf { it.length }
                     if (cur.isNotEmpty() && len > 220 && startsThought(l.text)) flush()
                     if (cur.isNotEmpty() && len > 700) flush()
-                    cur += l.text
+                    cur += l.text; curIdx += li
                 }
             }
         }
@@ -186,16 +340,22 @@ class ReaderActivity : Activity() {
 @font-face{font-family:'ZSans';src:url('fonts/sans-700.woff2') format('woff2');font-weight:700}
 @font-face{font-family:'ZNaskh';src:url('fonts/naskh-400.woff2') format('woff2');font-weight:400}
 @font-face{font-family:'ZNaskh';src:url('fonts/naskh-700.woff2') format('woff2');font-weight:700}
-:root{--bg:#F8F4EA;--fg:#1B1B1B;--mu:#8A6D3B;--sz:24px;--ff:'ZSans'}
+:root{--hl:rgba(212,169,47,.35);--bg:#F8F4EA;--fg:#1B1B1B;--mu:#8A6D3B;--sz:24px;--ff:'ZSans'}
 html,body{background:var(--bg)}
 body{margin:0;padding:22px 20px 90px;color:var(--fg);font-family:var(--ff),serif}
 .ar{font-size:var(--sz);line-height:1.95;margin:0 0 1.6em;text-align:justify;text-align-last:right;word-spacing:.04em}
 .note{font-size:calc(var(--sz)*.68);line-height:1.8;color:var(--mu);text-align:center;margin:.2em 0 1.2em;font-weight:700}
 h3{font-size:calc(var(--sz)*.8);color:var(--mu);text-align:center;margin:1.4em 0 .8em}
 .sep{text-align:center;color:var(--mu);margin:.4em 0 1.2em;font-size:calc(var(--sz)*.7)}
+.ph{border-radius:6px;transition:background .25s}
+.ph.cur{background:var(--hl);box-shadow:0 0 0 3px var(--hl)}
 .src{font-size:13px;color:var(--mu);text-align:center;margin-top:2.4em;opacity:.8}
-</style></head><body>${paragraphs()}<div class='src'>${esc(item.source)}</div>
-<script>function setStyle(bg,fg,mu,sz,ff){var r=document.documentElement.style;r.setProperty('--bg',bg);r.setProperty('--fg',fg);r.setProperty('--mu',mu);r.setProperty('--sz',sz+'px');r.setProperty('--ff',ff);}</script>
+</style></head><body style="padding-bottom:${if (recs.isNotEmpty()) 150 else 90}px">${paragraphs()}<div class='src'>${esc(item.source)}</div>
+<script>var curEl=null,follow=true,lastTouch=0;
+window.addEventListener('touchstart',function(){lastTouch=Date.now();},{passive:true});
+function hl(i){var e=document.getElementById('l'+i);if(e===curEl)return;if(curEl)curEl.classList.remove('cur');curEl=e;if(!e)return;e.classList.add('cur');
+ if(Date.now()-lastTouch>4000){var r=e.getBoundingClientRect();if(r.top<90||r.bottom>window.innerHeight-60){window.scrollTo({top:window.scrollY+r.top-window.innerHeight*0.33,behavior:'smooth'});}}}
+function setStyle(bg,fg,mu,sz,ff){var r=document.documentElement.style;r.setProperty('--bg',bg);r.setProperty('--fg',fg);r.setProperty('--mu',mu);r.setProperty('--sz',sz+'px');r.setProperty('--ff',ff);}</script>
 </body></html>"""
         web.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null)
         apply()
@@ -297,7 +457,9 @@ h3{font-size:calc(var(--sz)*.8);color:var(--mu);text-align:center;margin:1.4em 0
 
     companion object {
         const val EXTRA_ID = "id"
-        fun open(ctx: Context, id: String) = ctx.startActivity(Intent(ctx, ReaderActivity::class.java).putExtra(EXTRA_ID, id))
+        const val EXTRA_RECITER = "reciter"
+        fun open(ctx: Context, id: String, reciter: String? = null) =
+            ctx.startActivity(Intent(ctx, ReaderActivity::class.java).putExtra(EXTRA_ID, id).apply { if (reciter != null) putExtra(EXTRA_RECITER, reciter) })
     }
 }
 

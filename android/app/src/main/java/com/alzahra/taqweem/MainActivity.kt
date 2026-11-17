@@ -469,14 +469,33 @@ class MainActivity : Activity() {
         val items = if (kind == "dua") Prayers.duas(this) else Prayers.ziyarat(this)
         Dialogs.sheet(this, if (kind == "dua") "🤲" else "🕌", if (kind == "dua") "الأدعية" else "الزيارات", "النص الكامل من مفاتيح الجنان") { col, dialog ->
             items.forEach { item ->
-                val r = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
+                val r = ui.row().apply {
                     background = ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
-                    setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12))
+                    setPadding(ui.dp(16), ui.dp(12), ui.dp(12), ui.dp(12))
                     setOnClickListener { dialog.dismiss(); ReaderActivity.open(this@MainActivity, item.id) }
                 }
-                r.addView(ui.text(item.title, 17f, ui.ink, bold = true))
-                if (item.subtitle.isNotBlank()) r.addView(ui.text(item.subtitle, 13f, Colors.MUTED))
+                val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                tx.addView(ui.text(item.title, 17f, ui.ink, bold = true))
+                if (item.subtitle.isNotBlank()) tx.addView(ui.text(item.subtitle, 13f, Colors.MUTED))
+                r.addView(tx, ui.weight())
+                val recs = Recitations.forPrayer(this, item.id)
+                if (recs.isNotEmpty()) {
+                    // Reciter choice on the left of the card.
+                    r.addView(ui.text("🎙 اختر القارئ\n${CalendarData.ar(recs.size)} ${if (recs.size > 2) "قرّاء" else "قارئ"}", 12.5f, ui.ink, bold = true).apply {
+                        gravity = Gravity.CENTER
+                        setPadding(ui.dp(10), ui.dp(8), ui.dp(10), ui.dp(8))
+                        background = ui.rounded(Colors.SOFT, 12, ui.theme.accent, 1)
+                        setOnClickListener {
+                            Dialogs.sheet(this@MainActivity, "🎙", "اختر القارئ", item.title) { c2, d2 ->
+                                recs.forEach { rc ->
+                                    c2.addView(ui.outlineButton("▶  ${rc.name}") {
+                                        d2.dismiss(); dialog.dismiss(); ReaderActivity.open(this@MainActivity, item.id, rc.reciter)
+                                    })
+                                }
+                            }
+                        }
+                    }, ui.wrap(8, 0, 0, 0))
+                }
                 col.addView(r, ui.match(0, 4, 0, 4))
             }
         }

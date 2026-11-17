@@ -489,7 +489,7 @@ class MainActivity : Activity() {
                         setOnClickListener {
                             Dialogs.sheet(this@MainActivity, "🎙", "اختر القارئ", item.title) { c2, d2 ->
                                 recs.forEach { rc ->
-                                    c2.addView(ui.outlineButton("▶  ${rc.name}") {
+                                    c2.addView(ui.outlineButton("▶  ${rc.label}") {
                                         d2.dismiss(); dialog.dismiss(); ReaderActivity.open(this@MainActivity, item.id, rc.reciter)
                                     })
                                 }

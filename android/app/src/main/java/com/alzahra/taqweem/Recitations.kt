@@ -15,6 +15,9 @@ object Recitations {
     data class Seg(val line: Int, val start: Double, val end: Double)
     data class Rec(val reciter: String, val name: String, val urls: List<String>, val sync: List<Seg>) {
         val url get() = urls.first()
+        /** Recordings whose phrase timing did not pass the accuracy check play without highlighting. */
+        val synced get() = sync.isNotEmpty()
+        val label get() = if (synced) name else "$name  (صوت فقط)"
     }
 
     @Volatile private var cache: Map<String, List<Rec>>? = null

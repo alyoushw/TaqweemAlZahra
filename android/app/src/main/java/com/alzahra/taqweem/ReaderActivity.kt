@@ -194,7 +194,7 @@ class ReaderActivity : Activity() {
         Dialogs.sheet(this, "🎙", "اختر القارئ", item.title) { col, dialog ->
             recs.forEach { r ->
                 val sel = r.reciter == rec?.reciter
-                col.addView(ui.text((if (sel) "◉  " else "○  ") + r.name, 17f, Colors.TEXT, bold = true).apply {
+                col.addView(ui.text((if (sel) "◉  " else "○  ") + r.label, 17f, Colors.TEXT, bold = true).apply {
                     setPadding(ui.dp(16), ui.dp(14), ui.dp(16), ui.dp(14))
                     background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
                     setOnClickListener {
@@ -204,7 +204,7 @@ class ReaderActivity : Activity() {
                     }
                 }, ui.match(0, 4, 0, 4))
             }
-            col.addView(ui.text("التلاوة تُشغَّل عبر الإنترنت، ويتم تظليل العبارة التي يقرؤها القارئ. اضغط على أي عبارة للانتقال إليها.", 12.5f, Colors.MUTED).apply { setPadding(0, ui.dp(8), 0, 0) })
+            col.addView(ui.text("التلاوة تُشغَّل عبر الإنترنت، ويتم تظليل العبارة التي يقرؤها القارئ. اضغط على أي عبارة للانتقال إليها. «صوت فقط»: تلاوة بدون تظليل لأن توقيتها لم يجتز فحص الدقة.", 12.5f, Colors.MUTED).apply { setPadding(0, ui.dp(8), 0, 0) })
         }
     }
 

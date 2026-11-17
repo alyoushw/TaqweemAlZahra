@@ -137,14 +137,37 @@ object Qibla {
             ui.text(s, 14f, Colors.TEXT, bold = true).apply { gravity = Gravity.CENTER; setPadding(ui.dp(4), ui.dp(9), ui.dp(4), ui.dp(9)) }
         }
         styleViews.forEach { styles.addView(it, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(ui.dp(4), 0, ui.dp(4), 0) }) }
-        compassBox.addView(styles, ui.match(0, 0, 0, 10))
         val compass = CompassView(activity, ui.theme.primary, ui.theme.accent)
-        compassBox.addView(compass, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         val big = ui.text("", 40f, ui.ink, bold = true).apply { gravity = Gravity.CENTER }
         val hint = ui.text("", 18f, Color.parseColor("#E65100"), bold = true).apply { gravity = Gravity.CENTER }
-        compassBox.addView(big, ui.match())
-        compassBox.addView(hint, ui.match(0, 2, 0, 8))
-        compassBox.addView(ui.text("البوصلة تتأثر بالحديد والأجهزة القريبة. للتأكد استخدم «الخريطة» وقارن الخط بالمبنى حولك، أو حرّك الجوال على شكل الرقم 8 لمعايرة البوصلة.", 12.5f, Colors.MUTED).apply { gravity = Gravity.CENTER })
+        val note = ui.text("البوصلة تتأثر بالحديد والأجهزة القريبة. للتأكد استخدم «الخريطة» وقارن الخط بالمبنى حولك، أو حرّك الجوال على شكل الرقم 8 لمعايرة البوصلة.", 12.5f, Colors.MUTED).apply { gravity = Gravity.CENTER }
+        // Portrait: everything in one column. Landscape: the compass on one side, the controls beside it.
+        val side = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+        val sideScroll = android.widget.ScrollView(activity).apply { isFillViewport = true }
+        var landLayout: Boolean? = null
+        fun arrangeCompass(land: Boolean) {
+            if (landLayout == land) return
+            landLayout = land
+            listOf(styles, compass, big, hint, note, side, sideScroll).forEach { (it.parent as? ViewGroup)?.removeView(it) }
+            if (land) {
+                compassBox.orientation = LinearLayout.HORIZONTAL
+                compassBox.layoutDirection = View.LAYOUT_DIRECTION_RTL
+                side.addView(styles, ui.match(0, 0, 0, 10)); side.addView(big, ui.match()); side.addView(hint, ui.match(0, 2, 0, 8)); side.addView(note)
+                sideScroll.addView(side)
+                compassBox.addView(sideScroll, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+                compassBox.addView(compass, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            } else {
+                compassBox.orientation = LinearLayout.VERTICAL
+                compassBox.addView(styles, ui.match(0, 0, 0, 10))
+                compassBox.addView(compass, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+                compassBox.addView(big, ui.match()); compassBox.addView(hint, ui.match(0, 2, 0, 8)); compassBox.addView(note)
+            }
+        }
+        arrangeCompass(activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+        compassBox.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val land = v.width > v.height * 1.15f
+            if (landLayout != land) v.post { arrangeCompass(land) }
+        }
 
         fun paintStyles() {
             val s = style(activity)
@@ -196,7 +219,13 @@ object Qibla {
                 .onFailure { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$KAABA_LAT,$KAABA_LON"))) }
         }
         panel.addView(android.widget.HorizontalScrollView(activity).apply { isHorizontalScrollBarEnabled = false; layoutDirection = View.LAYOUT_DIRECTION_RTL; addView(btns) })
-        panel.addView(ui.text("الخط الأصفر هو اتجاه القبلة من مكان وقوفك. قرّب الخريطة حتى ترى المبنى، وقارن الخط بالجدران أو الشارع لتعرف الاتجاه بدقة بدون الاعتماد على البوصلة.", 12f, Color.parseColor("#B3FFFFFF")).apply { setPadding(0, ui.dp(10), 0, 0) })
+        val mapHelp = ui.text("الخط الأصفر هو اتجاه القبلة من مكان وقوفك. قرّب الخريطة حتى ترى المبنى، وقارن الخط بالجدران أو الشارع لتعرف الاتجاه بدقة بدون الاعتماد على البوصلة.", 12f, Color.parseColor("#B3FFFFFF")).apply { setPadding(0, ui.dp(10), 0, 0) }
+        panel.addView(mapHelp)
+        // Sideways there is little height: hide the help text so the map stays visible.
+        mapBox.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val vis = if (v.width > v.height * 1.15f) View.GONE else View.VISIBLE
+            if (mapHelp.visibility != vis) v.post { mapHelp.visibility = vis }
+        }
         mapBox.addView(panel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM).apply { setMargins(ui.dp(10), 0, ui.dp(10), ui.dp(10)) })
 
         fun refreshTexts() {

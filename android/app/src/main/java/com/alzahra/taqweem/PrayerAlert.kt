@@ -17,6 +17,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -193,6 +194,13 @@ class AdhanActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        render(intent)
+    }
+
+    /** Turning the phone redraws the page in the layout that fits (both buttons always visible). */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
         render(intent)
     }
 
@@ -207,20 +215,22 @@ class AdhanActivity : Activity() {
         val snoozed = i.getBooleanExtra(PrayerAlert.EXTRA_SNOOZED, false)
         val day = CalendarData.byDate(this, LocalDate.now())
 
+        val land = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val bg = if (snoozed) Color.parseColor("#2A0E10") else ui.theme.primaryDark
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             setBackgroundColor(bg)
-            setPadding(ui.dp(24), ui.dp(48), ui.dp(24), ui.dp(32))
+            if (land) setPadding(ui.dp(24), ui.dp(14), ui.dp(24), ui.dp(14)) else setPadding(ui.dp(24), ui.dp(48), ui.dp(24), ui.dp(32))
         }
-        col.addView(ui.text(if (snoozed) "⏰" else "🕌", 64f, Color.WHITE).apply { gravity = Gravity.CENTER })
+        col.addView(ui.text(if (snoozed) "⏰" else "🕌", if (land) 36f else 64f, Color.WHITE).apply { gravity = Gravity.CENTER })
         if (day != null) col.addView(ui.text("${CalendarData.weekday(day)} • ${CalendarData.hijriLabel(day)}", 16f, Color.parseColor("#D9FFFFFF")).apply { gravity = Gravity.CENTER }, ui.match(0, 12, 0, 0))
         col.addView(ui.text(if (snoozed) "أخّرت ${PrayerAlert.prayerName(p)}\n١٠ دقائق" else PrayerAlert.title(p), 34f, ui.theme.accent, bold = true).apply {
             gravity = Gravity.CENTER; setLineSpacing(0f, 1.15f)
-        }, ui.match(0, 18, 0, 0))
-        col.addView(ui.text(time, 52f, Color.WHITE, bold = true).apply { gravity = Gravity.CENTER }, ui.match(0, 8, 0, 0))
+            if (land) textSize = 26f
+        }, ui.match(0, if (land) 6 else 18, 0, 0))
+        col.addView(ui.text(time, if (land) 36f else 52f, Color.WHITE, bold = true).apply { gravity = Gravity.CENTER }, ui.match(0, if (land) 2 else 8, 0, 0))
         col.addView(ui.text("حسب توقيت الأحساء — تقويم الزهراء", 14f, Color.parseColor("#B3FFFFFF")).apply { gravity = Gravity.CENTER })
         if (snoozed) {
             col.addView(ui.text(PrayerAlert.SNOOZE_MESSAGE, 20f, Color.WHITE, bold = true).apply {
@@ -234,19 +244,26 @@ class AdhanActivity : Activity() {
         fun big(label: String, fill: Int, fg: Int, onClick: () -> Unit) = TextView(this).apply {
             text = label; textSize = 20f; setTextColor(fg); gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, ui.dp(18), 0, ui.dp(18))
+            setPadding(0, ui.dp(if (land) 14 else 18), 0, ui.dp(if (land) 14 else 18))
             background = ui.rounded(fill, 20)
             setOnClickListener { onClick() }
         }
-        col.addView(big(if (snoozed) "✓ سأصلي الآن" else "⏹ إيقاف الأذان", ui.theme.accent, Color.parseColor("#2A1A00")) {
+        // Portrait: the buttons one above the other; landscape: side by side.
+        val buttons = if (land) LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL } else col
+        fun btnLp(first: Boolean) = if (land) LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { if (first) marginEnd = ui.dp(10) }
+            else ui.match(0, 0, 0, if (first) 10 else 0)
+        buttons.addView(big(if (snoozed) "✓ سأصلي الآن" else "⏹ إيقاف الأذان", ui.theme.accent, Color.parseColor("#2A1A00")) {
             AdhanService.stop(this); PrayerAlert.clear(this); finish()
-        }, ui.match(0, 0, 0, 10))
-        col.addView(big("⏰ تأجيل ١٠ دقائق", Color.parseColor("#33FFFFFF"), Color.WHITE) {
+        }, btnLp(true))
+        buttons.addView(big("⏰ تأجيل ١٠ دقائق", Color.parseColor("#33FFFFFF"), Color.WHITE) {
             AdhanService.stop(this); PrayerAlert.clear(this); PrayerAlert.scheduleSnooze(this, p, time)
             android.widget.Toast.makeText(this, "سيتم تذكيرك بعد ١٠ دقائق", android.widget.Toast.LENGTH_SHORT).show()
             finish()
-        }, ui.match(0, 0, 0, 0))
-        setContentView(col)
+        }, btnLp(false))
+        if (land) col.addView(buttons, ui.match(0, 10, 0, 0))
+        // Scrolls if a very small screen still can't fit everything, so no button is ever cut off.
+        val scroll = android.widget.ScrollView(this).apply { isFillViewport = true; setBackgroundColor(bg); addView(col) }
+        setContentView(scroll)
         Immersive.padBottom(col)
         Immersive.apply(window)
     }

@@ -227,7 +227,9 @@ class ReaderActivity : Activity() {
             setOnPreparedListener {
                 prepared = true
                 seekBar?.max = it.duration
-                if (seekMs >= 0) it.seekTo(seekMs)
+                // Skip any introduction: start where the dua itself begins (unless a phrase was tapped).
+                val introSkip = ((r.sync.firstOrNull()?.start ?: 0.0) - 0.4).coerceAtLeast(0.0)
+                it.seekTo(if (seekMs >= 0) seekMs else (introSkip * 1000).toInt())
                 it.start(); playBtn?.text = "⏸"; loop()
             }
             setOnCompletionListener { playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null) }

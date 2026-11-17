@@ -13,9 +13,9 @@ import java.time.LocalDate
  */
 object TableWeb {
 
-    private fun hex(c: Int) = String.format("#%06X", 0xFFFFFF and c)
+    private fun hex(c: Int) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c)
     private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    private fun ar(s: String) = s.map { if (it.isDigit()) "٠١٢٣٤٥٦٧٨٩"[it - '0'] else it }.joinToString("")
+    private fun ar(s: String) = s.map { if (it in '0'..'9') "٠١٢٣٤٥٦٧٨٩"[it - '0'] else it }.joinToString("")
 
     fun html(activity: Activity, month: Int): String {
         val t = Themes.current(activity)

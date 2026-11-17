@@ -68,7 +68,7 @@ object CalendarData {
         val p = t.split(":"); val h = p.getOrNull(0)?.toIntOrNull() ?: return t; val m = p.getOrNull(1)?.toIntOrNull() ?: return t
         val total = h * 60 + m + add
         val nh = (total / 60).let { if (it > 12) it - 12 else it }
-        return "$nh:${"%02d".format(total % 60)}"
+        return "$nh:${"%02d".format(java.util.Locale.US, total % 60)}"
     }
 
     fun days(ctx: Context): List<Day> {
@@ -172,5 +172,5 @@ object CalendarData {
     fun gregLabel(d: LocalDate) = "${d.dayOfMonth}/${d.monthValue}/${d.year}"
 
     private const val AR_DIGITS = "٠١٢٣٤٥٦٧٨٩"
-    fun ar(n: Int): String = n.toString().map { if (it.isDigit()) AR_DIGITS[it - '0'] else it }.joinToString("")
+    fun ar(n: Int): String = n.toString().map { if (it in '0'..'9') AR_DIGITS[it - '0'] else it }.joinToString("")
 }

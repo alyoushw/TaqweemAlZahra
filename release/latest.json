@@ -1,6 +1,6 @@
 {
-  "versionCode": 19,
-  "versionName": "3.9.3",
+  "versionCode": 20,
+  "versionName": "3.9.4",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "خيار جديد في الإعدادات ⚙: «إظهار أزرار الجوال» لإبقاء أزرار التنقل أسفل الشاشة ظاهرة داخل التطبيق."
+  "notes": "إصلاح توقف التطبيق عند تفعيل تأخير صلاة الفجر في الجوالات اللي لغتها عربي. وإصلاح عرض صفحات التقويم الكامل في هذه الجوالات."
 }

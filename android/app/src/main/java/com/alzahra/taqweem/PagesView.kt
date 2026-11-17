@@ -24,16 +24,16 @@ object PagesView {
     }
 
     private fun html(ctx: Context, pages: IntRange, primary: Int, accent: Int): String {
-        val p = String.format("#%06X", 0xFFFFFF and primary)
-        val a = String.format("#%06X", 0xFFFFFF and accent)
+        val p = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and primary)
+        val a = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and accent)
         val cards = pages.joinToString("") { i ->
             """<div class="card" id="p$i"><div class="head"><span class="t">${pageTitle(ctx, i)}</span><span class="n">صفحة $i من ١٣</span></div>
-               <img src="pages/page_%02d.jpg" loading="lazy"/></div>""".format(i)
+               <img src="pages/page_%02d.jpg" loading="lazy"/></div>""".format(java.util.Locale.US, i)
         }
         return """<!doctype html><html dir="rtl"><head><meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes">
 <style>
-body{margin:0;padding:8px;background:${String.format("#%06X", 0xFFFFFF and Colors.BG)};font-family:sans-serif}
-.card{background:${String.format("#%06X", 0xFFFFFF and Colors.CARD)};border:2px solid $a;border-radius:16px;overflow:hidden;margin:0 0 14px}
+body{margin:0;padding:8px;background:${String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and Colors.BG)};font-family:sans-serif}
+.card{background:${String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and Colors.CARD)};border:2px solid $a;border-radius:16px;overflow:hidden;margin:0 0 14px}
 .head{background:$p;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:8px}
 .t{font-weight:bold;font-size:15px}
 .n{background:$a;color:#3a2a00;border-radius:8px;padding:5px 9px;font-weight:bold;font-size:13px;white-space:nowrap}

@@ -197,7 +197,7 @@ class ReaderActivity : Activity() {
         return bar
     }
 
-    private fun fmt(ms: Int): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
+    private fun fmt(ms: Int): String { val s = ms / 1000; return "%d:%02d".format(java.util.Locale.US, s / 60, s % 60) }
 
     private fun chooseReciter() {
         Dialogs.sheet(this, "🎙", "اختر القارئ", item.title) { col, dialog ->

@@ -1,6 +1,6 @@
 {
-  "versionCode": 21,
-  "versionName": "3.9.5",
+  "versionCode": 22,
+  "versionName": "3.9.6",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "الدعاء يضل شغال لو طلعت من التطبيق أو طفّيت الشاشة، مع إشعار فيه إيقاف مؤقت وإنهاء. وشريط الصوت صار فوق أزرار الجوال ولونه يمتد تحتها."
+  "notes": "إصلاح الوضع الأفقي: صفحة الأذان يظهر فيها زر الإيقاف والتأجيل جنب بعض، وصفحة القبلة تعرض البوصلة في جهة والتحكم في الجهة الثانية، والخريطة ما يغطيها النص."
 }

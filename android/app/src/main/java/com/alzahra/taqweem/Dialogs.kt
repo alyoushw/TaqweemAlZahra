@@ -96,6 +96,20 @@ object Dialogs {
         }
     }
 
+    fun fajrInfo(activity: Activity) {
+        sheet(activity, "🌅", "تأخير صلاة الفجر للاحتياط", null) { col, dialog ->
+            val ui = Ui(activity)
+            col.addView(ui.card(Colors.SOFT, ui.theme.accent).apply {
+                addView(ui.text(
+                    "نظراً لاختلاف الفلكيين في دخول الفجر الصادق، فمقتضى الاحتياط الإمساك للصيام قبل أذان الصبح بـ (٨) دقائق، وتأخير أداء صلاة الصبح عن الأذان بـ (١٣) دقيقة.\n\n(تقويم مكتب سماحة السيد علي السيستاني دام ظله — كما ورد في تنبيهات تقويم الزهراء)",
+                    16f, Colors.TEXT, bold = true,
+                ).apply { setLineSpacing(0f, 1.35f) })
+            })
+            col.addView(ui.text("عند تفعيل الخيار يُضاف ١٣ دقيقة إلى وقت الفجر في الجدول وتفاصيل اليوم والعد التنازلي والأذان والودجت. الإمساك لا يتغير.", 13.5f, Colors.MUTED).apply { setPadding(0, ui.dp(8), 0, ui.dp(4)) })
+            col.addView(ui.primaryButton("حسناً") { dialog.dismiss() })
+        }
+    }
+
     // ---------- الإشعارات ----------
     fun notifications(activity: Activity) {
         sheet(activity, "🔔", "إشعارات مواقيت الصلاة", "تنبيهات تظهر على شاشة القفل وستارة الإشعارات في جوالك") { col, _ ->

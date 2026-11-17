@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "3.5.0",
+  "versionCode": 12,
+  "versionName": "3.6.0",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "الأدعية والزيارات بنصها الكامل من مفاتيح الجنان (١٤ دعاء و٩ زيارات)، تُفتح في صفحة كاملة للقراءة مع تكبير وتصغير الخط وتغيير لون الخط والخلفية، ويحفظ مكان توقفك."
+  "notes": "خيار جديد في الإعدادات ← الصلاة: «تأخير صلاة الفجر ١٣ دقيقة للاحتياط» حسب تنبيه مكتب السيد السيستاني، ويُطبّق على التقويم والأذان والودجت."
 }

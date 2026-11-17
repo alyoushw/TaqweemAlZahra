@@ -247,6 +247,34 @@ class MainActivity : Activity() {
             row("🎨", "مظهر التطبيق", "اختيار اللون: ${ui.theme.title}") { Dialogs.theme(this) { recreate() } }
             row("▦", "ودجت الشاشة الرئيسية", "المقاس والألوان والمحتوى") { Dialogs.widgetSettings(this) }
             group("الصلاة")
+            // Fajr precaution toggle with an info button.
+            val fr = ui.row().apply {
+                setPadding(ui.dp(14), ui.dp(10), ui.dp(10), ui.dp(10))
+                background = ui.rounded(Colors.CARD, 16, Colors.STROKE, 1)
+            }
+            fr.addView(ui.text("🌅", 22f, ui.ink).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)))
+            val ft = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, 0, 0) }
+            ft.addView(ui.text("تأخير صلاة الفجر ١٣ دقيقة للاحتياط", 15.5f, Colors.TEXT, bold = true))
+            ft.addView(ui.text("يُطبَّق على التقويم والتنبيهات والودجت", 12.5f, Colors.MUTED))
+            fr.addView(ft, ui.weight())
+            fr.addView(ui.text("؟", 18f, ui.onFill, bold = true).apply {
+                gravity = Gravity.CENTER
+                background = ui.rounded(ui.fill, 18)
+                setOnClickListener { Dialogs.fajrInfo(this@MainActivity) }
+            }, LinearLayout.LayoutParams(ui.dp(34), ui.dp(34)).apply { setMargins(ui.dp(6), 0, ui.dp(6), 0) })
+            val sw = android.widget.Switch(this)
+            fr.setOnClickListener { sw.toggle() }
+            fr.addView(sw.apply {
+                isChecked = CalendarData.fajrDelayOn(this@MainActivity)
+                setOnCheckedChangeListener { _, on ->
+                    CalendarData.setFajrDelay(this@MainActivity, on)
+                    AlarmScheduler.scheduleNext(this@MainActivity)
+                    ZahraWidget.updateAll(this@MainActivity)
+                    Toast.makeText(this@MainActivity, if (on) "تم تأخير وقت الفجر ١٣ دقيقة" else "تم إرجاع وقت الفجر كما في التقويم", Toast.LENGTH_SHORT).show()
+                    dialog.setOnDismissListener { selectTab(tab) }
+                }
+            })
+            col.addView(fr, ui.match(0, 4, 0, 4))
             row("🔔", "الإشعارات والأذان", "تنبيهات الصلاة ومناسبة اليوم") { Dialogs.notifications(this) }
             row("🧭", "اتجاه القبلة", "البوصلة وخريطة الأقمار الصناعية") { Qibla.show(this) }
             row("⚠", "تنبيه السيستاني", "الاحتياط في الإمساك وصلاة الصبح") { Dialogs.sistani(this) }

@@ -55,12 +55,29 @@ object CalendarData {
 
     @Volatile private var cache: List<Day>? = null
 
+    /** Precautionary 13-minute delay of fajr (Sayyid al-Sistani's office note on the calendar). */
+    const val FAJR_DELAY_MIN = 13
+    fun fajrDelayOn(ctx: Context) = ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE).getBoolean("fajr_delay", false)
+    fun setFajrDelay(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE).edit().putBoolean("fajr_delay", on).apply()
+        cache = null // every screen, the widget and the alarms re-read the times
+    }
+
+    /** "4:39" + 13 minutes -> "4:52" (same 12-hour style as the printed calendar). */
+    private fun addMinutes(t: String, add: Int): String {
+        val p = t.split(":"); val h = p.getOrNull(0)?.toIntOrNull() ?: return t; val m = p.getOrNull(1)?.toIntOrNull() ?: return t
+        val total = h * 60 + m + add
+        val nh = (total / 60).let { if (it > 12) it - 12 else it }
+        return "$nh:${"%02d".format(total % 60)}"
+    }
+
     fun days(ctx: Context): List<Day> {
         cache?.let { return it }
         synchronized(this) {
             cache?.let { return it }
             val json = ctx.applicationContext.assets.open("calendar.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
             val arr = JSONObject(json).getJSONArray("days")
+            val delay = fajrDelayOn(ctx)
             val list = ArrayList<Day>(arr.length())
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
@@ -77,7 +94,7 @@ object CalendarData {
                     mark = o.getString("mark"), sakan = o.getString("sakan"), hijama = o.getString("hij"),
                     tale = o.getString("tale"),
                     times = DayTimes(
-                        t.getString("imsak"), t.getString("fajr"), t.getString("sunrise"), t.getString("dhuhr"),
+                        t.getString("imsak"), t.getString("fajr").let { if (delay) addMinutes(it, FAJR_DELAY_MIN) else it }, t.getString("sunrise"), t.getString("dhuhr"),
                         t.getString("maghrib"), t.getString("midnight"), t.getString("qibla"), t.getString("sahur"),
                     ),
                     occasions = occ,

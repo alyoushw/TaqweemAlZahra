@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "3.6.0",
+  "versionCode": 13,
+  "versionName": "3.6.1",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "خيار جديد في الإعدادات ← الصلاة: «تأخير صلاة الفجر ١٣ دقيقة للاحتياط» حسب تنبيه مكتب السيد السيستاني، ويُطبّق على التقويم والأذان والودجت."
+  "notes": "صفحة الأدعية والزيارات بشكل الكتاب: فقرات متصلة بخط عربي واضح، العنوان في المنتصف وزر «عودة»، تكبير وتصغير الخط بإصبعين، وزر Aa لحجم الخط ونوعه والألوان."
 }

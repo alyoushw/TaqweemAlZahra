@@ -473,7 +473,8 @@ class MainActivity : Activity() {
                 val r = ui.row().apply {
                     background = ui.rounded(Colors.CARD, 14, Colors.STROKE, 1)
                     setPadding(ui.dp(16), ui.dp(12), ui.dp(12), ui.dp(12))
-                    setOnClickListener { dialog.dismiss(); ReaderActivity.open(this@MainActivity, item.id) }
+                    // Keep the list open underneath, so "back" from the dua returns to it.
+                    setOnClickListener { ReaderActivity.open(this@MainActivity, item.id) }
                 }
                 val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 tx.addView(ui.text(item.title, 17f, ui.ink, bold = true))
@@ -490,7 +491,7 @@ class MainActivity : Activity() {
                             Dialogs.sheet(this@MainActivity, "🎙", "اختر القارئ", item.title) { c2, d2 ->
                                 recs.forEach { rc ->
                                     c2.addView(ui.outlineButton("▶  ${rc.label}") {
-                                        d2.dismiss(); dialog.dismiss(); ReaderActivity.open(this@MainActivity, item.id, rc.reciter)
+                                        d2.dismiss(); ReaderActivity.open(this@MainActivity, item.id, rc.reciter)
                                     })
                                 }
                             }

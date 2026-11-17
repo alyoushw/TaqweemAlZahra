@@ -124,8 +124,17 @@ class ReaderActivity : Activity() {
                 return true
             }
         })
-        web.setOnTouchListener { _, ev ->
+        // No text selection: a long press (or the first finger of a pinch) must not select words.
+        web.isLongClickable = false
+        web.isHapticFeedbackEnabled = false
+        web.setOnLongClickListener { true }
+        web.setOnTouchListener { v, ev ->
             pinch.onTouchEvent(ev)
+            if (ev.actionMasked == android.view.MotionEvent.ACTION_POINTER_DOWN) {
+                // Second finger down: cancel the first finger's touch inside the page (no long-press, no tap).
+                val c = android.view.MotionEvent.obtain(ev); c.action = android.view.MotionEvent.ACTION_CANCEL
+                (v as WebView).onTouchEvent(c); c.recycle()
+            }
             // While two fingers are down, keep the page still so only the text size changes.
             ev.pointerCount > 1 || pinch.isInProgress
         }
@@ -349,7 +358,7 @@ class ReaderActivity : Activity() {
 @font-face{font-family:'ZNaskh';src:url('fonts/naskh-400.woff2') format('woff2');font-weight:400}
 @font-face{font-family:'ZNaskh';src:url('fonts/naskh-700.woff2') format('woff2');font-weight:700}
 :root{--hl:rgba(212,169,47,.35);--bg:#F8F4EA;--fg:#1B1B1B;--mu:#8A6D3B;--sz:24px;--ff:'ZSans'}
-html,body{background:var(--bg)}
+html,body{background:var(--bg);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body{margin:0;padding:22px 20px 90px;color:var(--fg);font-family:var(--ff),serif}
 .ar{font-size:var(--sz);line-height:1.95;margin:0 0 1.6em;text-align:justify;text-align-last:right;word-spacing:.04em}
 .note{font-size:calc(var(--sz)*.68);line-height:1.8;color:var(--mu);text-align:center;margin:.2em 0 1.2em;font-weight:700}

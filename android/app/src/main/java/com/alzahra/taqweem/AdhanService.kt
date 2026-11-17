@@ -21,6 +21,10 @@ enum class AdhanVoice(val id: String, val title: String, val res: Int) {
     REZAIYAN("rezaiyan", "حسن رضائيان", R.raw.adhan_rezaiyan),
     SHARIF("sharif", "حسين شريف", R.raw.adhan_sharif),
     KAZEM_ZADEH("kazem_zadeh", "كاظم زاده", R.raw.adhan_kazem_zadeh),
+    // Full Shia adhans from the shiafy library.
+    AHSAI("ahsai", "أبو حسن الأحسائي — أذان كامل", R.raw.adhan_ahsai),
+    ABBAS_YOUSIF("abbas_yousif", "عباس يوسف — أذان الشيعة كامل", R.raw.adhan_abbas_yousif),
+    ABATHER_KHASHI("abather_khashi", "أباذر الحلواجي — الأذان الخاشع كامل", R.raw.adhan_abather_khashi),
     ;
 
     companion object {

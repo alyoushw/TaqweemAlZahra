@@ -1,6 +1,6 @@
 {
-  "versionCode": 22,
-  "versionName": "3.9.6",
+  "versionCode": 23,
+  "versionName": "3.9.7",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "إصلاح الوضع الأفقي: صفحة الأذان يظهر فيها زر الإيقاف والتأجيل جنب بعض، وصفحة القبلة تعرض البوصلة في جهة والتحكم في الجهة الثانية، والخريطة ما يغطيها النص."
+  "notes": "أصوات أذان شيعي كاملة جديدة: أبو حسن الأحسائي، عباس يوسف، وأباذر الحلواجي (الأذان الخاشع). تختارها من الإعدادات ⚙ ← الإشعارات والأذان."
 }

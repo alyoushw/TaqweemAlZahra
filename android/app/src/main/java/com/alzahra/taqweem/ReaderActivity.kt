@@ -215,7 +215,7 @@ class ReaderActivity : Activity() {
         web.evaluateJavascript("hl(-1)", null); lastHl = -2
     }
 
-    private fun startPlayback(seekMs: Int = -1) {
+    private fun startPlayback(seekMs: Int = -1, source: Int = 0) {
         val r = rec ?: return
         Recitations.remember(this, item.id, r.reciter)
         val p = player
@@ -234,11 +234,18 @@ class ReaderActivity : Activity() {
             }
             setOnCompletionListener { playBtn?.text = "▶"; tick.removeCallbacksAndMessages(null) }
             setOnErrorListener { _, _, _ ->
-                Toast.makeText(this@ReaderActivity, "تعذر تشغيل التلاوة — تأكد من اتصال الإنترنت", Toast.LENGTH_LONG).show()
-                releasePlayer(); true
+                tryNextSource(r, seekMs, source); true
             }
-            runCatching { setDataSource(r.url); prepareAsync() }.onFailure { releasePlayer() }
+            runCatching { setDataSource(r.urls[source]); prepareAsync() }.onFailure { tryNextSource(r, seekMs, source) }
         }
+    }
+
+    /** The recording failed to load from one address: try the next copy, or tell the user. */
+    private fun tryNextSource(r: Recitations.Rec, seekMs: Int, source: Int) {
+        releasePlayer()
+        if (r != rec) return
+        if (source + 1 < r.urls.size) startPlayback(seekMs, source + 1)
+        else Toast.makeText(this, "تعذر تشغيل التلاوة — تأكد من اتصال الإنترنت", Toast.LENGTH_LONG).show()
     }
 
     private fun togglePlay() {

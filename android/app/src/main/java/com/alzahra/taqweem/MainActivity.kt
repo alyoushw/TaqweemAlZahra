@@ -110,6 +110,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Updater.check(this, manual = false) { showUpdateBanner(it) }
+        Recitations.refresh(this)
         if (tab == 1) selectTab(1)
     }
 

@@ -41,7 +41,9 @@ object Dialogs {
         build(col, dialog)
         dialog.setContentView(ui.scroll(col))
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        dialog.window?.setLayout((activity.resources.displayMetrics.widthPixels * 0.94).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+        // On a sideways phone keep sheets at a comfortable reading width.
+        val dm = activity.resources.displayMetrics
+        dialog.window?.setLayout(minOf((dm.widthPixels * 0.94).toInt(), (600 * dm.density).toInt()), ViewGroup.LayoutParams.WRAP_CONTENT)
         dialog.showImmersive()
         return dialog
     }

@@ -230,7 +230,9 @@ object Qibla {
             override fun onSensorChanged(e: SensorEvent) {
                 SensorManager.getRotationMatrixFromVector(rot, e.values)
                 SensorManager.getOrientation(rot, ori)
-                val az = ((Math.toDegrees(ori[0].toDouble()) + 360) % 360).toFloat()
+                // Heading of the top of the screen: add the display rotation when the phone is held sideways.
+                @Suppress("DEPRECATION") val turn = activity.windowManager.defaultDisplay.rotation * 90
+                val az = ((Math.toDegrees(ori[0].toDouble()) + turn + 360) % 360).toFloat()
                 heading = if (heading.isNaN()) az else {
                     var d = az - heading
                     if (d > 180) d -= 360f

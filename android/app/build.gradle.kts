@@ -19,8 +19,8 @@ android {
         applicationId = "com.alzahra.taqweem"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "3.9.7"
+        versionCode = 24
+        versionName = "3.9.8"
     }
 
     signingConfigs {

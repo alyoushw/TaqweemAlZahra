@@ -1,6 +1,6 @@
 {
-  "versionCode": 23,
-  "versionName": "3.9.7",
+  "versionCode": 24,
+  "versionName": "3.9.8",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "أصوات أذان شيعي كاملة جديدة: أبو حسن الأحسائي، عباس يوسف، وأباذر الحلواجي (الأذان الخاشع). تختارها من الإعدادات ⚙ ← الإشعارات والأذان."
+  "notes": "صفحة الأذان تخلي الشاشة شغالة ١٥ ثانية بس، وبعدها تطفي حتى لو ما ضغطت شي (الأذان يكمل). والتأجيل صار يحسب المدة كلها: ١٠ ثم ٢٠ ثم ٣٠ دقيقة."
 }

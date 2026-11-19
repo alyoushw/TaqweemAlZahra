@@ -38,6 +38,13 @@ object PrayerAlert {
     const val EXTRA_PRAYER = "prayer"
     const val EXTRA_TIME = "time"
     const val EXTRA_SNOOZED = "snoozed"
+    /** Minutes the prayer has been put off so far (10, 20, 30 … after each «تأجيل»). */
+    const val EXTRA_DELAY = "delay_min"
+    /** The adhan page keeps the screen awake this long, then lets it turn off even if nothing was pressed. */
+    const val SCREEN_ON_MS = 15_000L
+
+    /** "١٠ دقائق", "٢٠ دقيقة" … */
+    fun minutesLabel(m: Int) = "${CalendarData.ar(m)} ${if (m in 3..10) "دقائق" else "دقيقة"}"
 
     private fun sp(ctx: Context) = ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE)
     fun fullScreenOn(ctx: Context) = sp(ctx).getBoolean("adhan_fullscreen", false)
@@ -57,13 +64,13 @@ object PrayerAlert {
     }
 
     /** Opens the full-screen adhan page right away (like an alarm clock), when enabled and allowed. */
-    fun launchScreen(ctx: Context, p: Prayer, time: String, snoozed: Boolean) {
+    fun launchScreen(ctx: Context, p: Prayer, time: String, snoozed: Boolean, delay: Int = 0) {
         if (!fullScreenOn(ctx)) return
         runCatching {
             ctx.startActivity(
                 Intent(ctx, AdhanActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
-                    .putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_SNOOZED, snoozed),
+                    .putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_SNOOZED, snoozed).putExtra(EXTRA_DELAY, delay),
             )
         }
     }
@@ -90,19 +97,19 @@ object PrayerAlert {
         }
     }
 
-    private fun actionIntent(ctx: Context, action: String, p: Prayer, time: String, code: Int) =
+    private fun actionIntent(ctx: Context, action: String, p: Prayer, time: String, code: Int, delay: Int = 0) =
         PendingIntent.getBroadcast(
             ctx, code,
-            Intent(ctx, PrayerActionReceiver::class.java).setAction(action).putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time),
+            Intent(ctx, PrayerActionReceiver::class.java).setAction(action).putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_DELAY, delay),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-    private fun screenIntent(ctx: Context, p: Prayer, time: String, snoozed: Boolean) =
+    private fun screenIntent(ctx: Context, p: Prayer, time: String, snoozed: Boolean, delay: Int = 0) =
         PendingIntent.getActivity(
             ctx, if (snoozed) 41 else 40,
             Intent(ctx, AdhanActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                .putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_SNOOZED, snoozed),
+                .putExtra(EXTRA_PRAYER, p.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_SNOOZED, snoozed).putExtra(EXTRA_DELAY, delay),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
@@ -110,7 +117,7 @@ object PrayerAlert {
     fun prayerName(p: Prayer) = when (p) {
         Prayer.FAJR -> "صلاة الصبح"; Prayer.DHUHR -> "صلاة الظهر"; Prayer.MAGHRIB -> "صلاة المغرب"; else -> p.label
     }
-    const val SNOOZE_MESSAGE = "مضت ١٠ دقائق على دخول الوقت.\nاترك ما بيدك وأدِّ صلاتك المفروضة، فالصلاة في أول وقتها أحبّ إلى الله.\n﴿إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَوْقُوتًا﴾"
+    fun snoozeMessage(delay: Int) = "مضت ${minutesLabel(delay)} على دخول الوقت.\nاترك ما بيدك وأدِّ صلاتك المفروضة، فالصلاة في أول وقتها أحبّ إلى الله.\n﴿إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَوْقُوتًا﴾"
 
     /** The first alert at the prayer time. Used by the adhan service and by the silent mode. */
     fun prayerNotification(ctx: Context, channel: String, p: Prayer, time: String, ongoing: Boolean): Notification {
@@ -130,32 +137,34 @@ object PrayerAlert {
         return b.build()
     }
 
-    fun scheduleSnooze(ctx: Context, p: Prayer, time: String) {
+    /** @param delay minutes already put off before this snooze (0 at the adhan itself). */
+    fun scheduleSnooze(ctx: Context, p: Prayer, time: String, delay: Int = 0) {
         val am = ctx.getSystemService(AlarmManager::class.java)
         val at = System.currentTimeMillis() + SNOOZE_MIN * 60_000L
-        val pi = actionIntent(ctx, ACTION_SNOOZE_FIRE, p, time, 33)
+        val pi = actionIntent(ctx, ACTION_SNOOZE_FIRE, p, time, 33, delay + SNOOZE_MIN)
         val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
         runCatching { if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi) else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi) }
             .onFailure { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi) }
     }
 
     /** The reminder 10 minutes after «تأجيل»: different look, firm wording. */
-    fun showSnoozed(ctx: Context, p: Prayer, time: String) {
+    /** @param delay total minutes put off so far (10, 20, 30 …). */
+    fun showSnoozed(ctx: Context, p: Prayer, time: String, delay: Int) {
         ensureReminderChannel(ctx)
         val b = Notification.Builder(ctx, CH_REMIND)
             .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("⏰ أخّرت ${prayerName(p)} ١٠ دقائق")
+            .setContentTitle("⏰ أخّرت ${prayerName(p)} ${minutesLabel(delay)}")
             .setContentText("اترك ما بيدك وأدِّ صلاتك المفروضة")
-            .setStyle(Notification.BigTextStyle().bigText("${prayerName(p)} — دخل وقتها $time\n\n$SNOOZE_MESSAGE"))
+            .setStyle(Notification.BigTextStyle().bigText("${prayerName(p)} — دخل وقتها $time\n\n${snoozeMessage(delay)}"))
             .setCategory(Notification.CATEGORY_ALARM)
             .setColor(Color.parseColor("#C62828"))
             .setAutoCancel(true)
-            .setContentIntent(screenIntent(ctx, p, time, true))
+            .setContentIntent(screenIntent(ctx, p, time, true, delay))
             .addAction(Notification.Action.Builder(null, "✓ سأصلي الآن", actionIntent(ctx, ACTION_STOP, p, time, 34)).build())
-            .addAction(Notification.Action.Builder(null, "⏰ تأجيل ١٠ دقائق", actionIntent(ctx, ACTION_SNOOZE, p, time, 35)).build())
-        if (fullScreenOn(ctx)) b.setFullScreenIntent(screenIntent(ctx, p, time, true), true)
+            .addAction(Notification.Action.Builder(null, "⏰ تأجيل ١٠ دقائق", actionIntent(ctx, ACTION_SNOOZE, p, time, 35, delay)).build())
+        if (fullScreenOn(ctx)) b.setFullScreenIntent(screenIntent(ctx, p, time, true, delay), true)
         ctx.getSystemService(NotificationManager::class.java).notify(NOTIF_ID + 2, b.build())
-        launchScreen(ctx, p, time, true)
+        launchScreen(ctx, p, time, true, delay)
     }
 
     fun clear(ctx: Context) {
@@ -169,15 +178,16 @@ class PrayerActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val p = intent.getStringExtra(PrayerAlert.EXTRA_PRAYER)?.let { runCatching { Prayer.valueOf(it) }.getOrNull() } ?: Prayer.DHUHR
         val time = intent.getStringExtra(PrayerAlert.EXTRA_TIME) ?: ""
+        val delay = intent.getIntExtra(PrayerAlert.EXTRA_DELAY, 0)
         when (intent.action) {
             PrayerAlert.ACTION_STOP -> { AdhanService.stop(context); PrayerAlert.clear(context) }
             PrayerAlert.ACTION_SNOOZE -> {
                 AdhanService.stop(context)
                 PrayerAlert.clear(context)
-                PrayerAlert.scheduleSnooze(context, p, time)
+                PrayerAlert.scheduleSnooze(context, p, time, delay)
                 android.widget.Toast.makeText(context, "سيتم تذكيرك بعد ١٠ دقائق", android.widget.Toast.LENGTH_SHORT).show()
             }
-            PrayerAlert.ACTION_SNOOZE_FIRE -> PrayerAlert.showSnoozed(context, p, time)
+            PrayerAlert.ACTION_SNOOZE_FIRE -> PrayerAlert.showSnoozed(context, p, time, if (delay > 0) delay else PrayerAlert.SNOOZE_MIN)
         }
     }
 }
@@ -188,8 +198,21 @@ class AdhanActivity : Activity() {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
         else @Suppress("DEPRECATION") window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         render(intent)
+    }
+
+    private val screenTimer = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Keep the screen lit for a few seconds only; then the phone may turn it off (the adhan keeps playing). */
+    private fun keepScreenBriefly() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        screenTimer.removeCallbacksAndMessages(null)
+        screenTimer.postDelayed({ window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }, PrayerAlert.SCREEN_ON_MS)
+    }
+
+    override fun onDestroy() {
+        screenTimer.removeCallbacksAndMessages(null)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -213,6 +236,8 @@ class AdhanActivity : Activity() {
         val p = i.getStringExtra(PrayerAlert.EXTRA_PRAYER)?.let { runCatching { Prayer.valueOf(it) }.getOrNull() } ?: Prayer.DHUHR
         val time = i.getStringExtra(PrayerAlert.EXTRA_TIME) ?: ""
         val snoozed = i.getBooleanExtra(PrayerAlert.EXTRA_SNOOZED, false)
+        val delay = i.getIntExtra(PrayerAlert.EXTRA_DELAY, 0).let { if (snoozed && it == 0) PrayerAlert.SNOOZE_MIN else it }
+        keepScreenBriefly()
         val day = CalendarData.byDate(this, LocalDate.now())
 
         val land = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -226,14 +251,14 @@ class AdhanActivity : Activity() {
         }
         col.addView(ui.text(if (snoozed) "⏰" else "🕌", if (land) 36f else 64f, Color.WHITE).apply { gravity = Gravity.CENTER })
         if (day != null) col.addView(ui.text("${CalendarData.weekday(day)} • ${CalendarData.hijriLabel(day)}", 16f, Color.parseColor("#D9FFFFFF")).apply { gravity = Gravity.CENTER }, ui.match(0, 12, 0, 0))
-        col.addView(ui.text(if (snoozed) "أخّرت ${PrayerAlert.prayerName(p)}\n١٠ دقائق" else PrayerAlert.title(p), 34f, ui.theme.accent, bold = true).apply {
+        col.addView(ui.text(if (snoozed) "أخّرت ${PrayerAlert.prayerName(p)}\n${PrayerAlert.minutesLabel(delay)}" else PrayerAlert.title(p), 34f, ui.theme.accent, bold = true).apply {
             gravity = Gravity.CENTER; setLineSpacing(0f, 1.15f)
             if (land) textSize = 26f
         }, ui.match(0, if (land) 6 else 18, 0, 0))
         col.addView(ui.text(time, if (land) 36f else 52f, Color.WHITE, bold = true).apply { gravity = Gravity.CENTER }, ui.match(0, if (land) 2 else 8, 0, 0))
         col.addView(ui.text("حسب توقيت الأحساء — تقويم الزهراء", 14f, Color.parseColor("#B3FFFFFF")).apply { gravity = Gravity.CENTER })
         if (snoozed) {
-            col.addView(ui.text(PrayerAlert.SNOOZE_MESSAGE, 20f, Color.WHITE, bold = true).apply {
+            col.addView(ui.text(PrayerAlert.snoozeMessage(delay), 20f, Color.WHITE, bold = true).apply {
                 gravity = Gravity.CENTER; setLineSpacing(0f, 1.4f)
                 setPadding(ui.dp(14), ui.dp(16), ui.dp(14), ui.dp(16))
                 background = ui.rounded(Color.parseColor("#33FFFFFF"), 18)
@@ -256,7 +281,7 @@ class AdhanActivity : Activity() {
             AdhanService.stop(this); PrayerAlert.clear(this); finish()
         }, btnLp(true))
         buttons.addView(big("⏰ تأجيل ١٠ دقائق", Color.parseColor("#33FFFFFF"), Color.WHITE) {
-            AdhanService.stop(this); PrayerAlert.clear(this); PrayerAlert.scheduleSnooze(this, p, time)
+            AdhanService.stop(this); PrayerAlert.clear(this); PrayerAlert.scheduleSnooze(this, p, time, delay)
             android.widget.Toast.makeText(this, "سيتم تذكيرك بعد ١٠ دقائق", android.widget.Toast.LENGTH_SHORT).show()
             finish()
         }, btnLp(false))

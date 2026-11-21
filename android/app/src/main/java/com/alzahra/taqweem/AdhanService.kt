@@ -53,6 +53,8 @@ class AdhanService : Service() {
         if (session != null) return
         session = runCatching {
             android.media.session.MediaSession(this, "adhan").apply {
+                // Volume presses are handed to the provider only through a session callback.
+                setCallback(object : android.media.session.MediaSession.Callback() {})
                 setPlaybackToRemote(object : android.media.VolumeProvider(VOLUME_CONTROL_RELATIVE, 10, 5) {
                     override fun onAdjustVolume(direction: Int) { if (direction != 0) stopByKey() }
                 })

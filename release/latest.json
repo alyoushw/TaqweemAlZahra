@@ -1,6 +1,6 @@
 {
-  "versionCode": 24,
-  "versionName": "3.9.8",
+  "versionCode": 25,
+  "versionName": "3.9.9",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "صفحة الأذان تخلي الشاشة شغالة ١٥ ثانية بس، وبعدها تطفي حتى لو ما ضغطت شي (الأذان يكمل). والتأجيل صار يحسب المدة كلها: ١٠ ثم ٢٠ ثم ٣٠ دقيقة."
+  "notes": "مشاركة تفاصيل اليوم كصورة. وإيقاف الأذان بأزرار الصوت (حتى والشاشة مطفية)، أو بزر التشغيل أثناء ما صفحة الأذان مضيئة."
 }

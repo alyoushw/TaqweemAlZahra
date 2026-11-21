@@ -292,11 +292,34 @@ object Dialogs {
             }
             col.addView(sizes)
 
+            // What the one-row bar widget shows.
+            col.addView(ui.text("محتوى الودجت الشريطي (4 × 1):", 15f, Colors.TEXT, bold = true), ui.match(0, 12, 0, 4))
+            val modeViews = ArrayList<Pair<String, android.widget.TextView>>()
+            fun paintModes() = modeViews.forEach { (id, v) ->
+                val sel = WidgetPrefs.barMode(activity) == id
+                v.text = (if (sel) "◉  " else "○  ") + WidgetPrefs.BAR_MODES.first { it.first == id }.second
+                v.background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 12, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
+            }
+            WidgetPrefs.BAR_MODES.forEach { (id, _) ->
+                val v = ui.text("", 14.5f, Colors.TEXT, bold = true).apply {
+                    setPadding(ui.dp(14), ui.dp(10), ui.dp(14), ui.dp(10))
+                    setOnClickListener { WidgetPrefs.setBarMode(activity, id); paintModes(); ZahraWidget.updateAll(activity) }
+                }
+                modeViews += id to v
+                col.addView(v, ui.match(0, 3, 0, 3))
+            }
+            paintModes()
+
             col.addView(ui.text("٢. ألوان خلفية الودجت:", 16f, Colors.TEXT, bold = true), ui.match(0, 14, 0, 4))
             val bgViews = ArrayList<Pair<String, android.widget.TextView>>()
             fun paintBg() = bgViews.forEach { (id, v) ->
                 val c = WidgetPrefs.BACKGROUNDS.first { it.first == id }.third
-                val solid = if (id == "glass") Color.parseColor("#C9C6C1") else c or (0xFF shl 24)
+                val solid = when (id) {
+                    "glass" -> Color.parseColor("#C9C6C1")
+                    "frost" -> Color.parseColor("#9AA7B4") // light frosted swatch
+                    "none" -> Color.parseColor("#6B7280")
+                    else -> c or (0xFF shl 24)
+                }
                 v.background = ui.rounded(solid, 12, if (WidgetPrefs.bg(activity) == id) ui.theme.accent else Color.TRANSPARENT, 3)
             }
             WidgetPrefs.BACKGROUNDS.chunked(3).forEach { chunk ->
@@ -305,7 +328,7 @@ object Dialogs {
                     val v = ui.text(name, 14f, Color.WHITE, bold = true).apply {
                         gravity = Gravity.CENTER
                         setPadding(ui.dp(6), ui.dp(12), ui.dp(6), ui.dp(12))
-                        setOnClickListener { WidgetPrefs.setBg(activity, id); paintBg() }
+                        setOnClickListener { WidgetPrefs.setBg(activity, id); paintBg(); ZahraWidget.updateAll(activity) }
                     }
                     bgViews += id to v
                     r.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)) })
@@ -328,7 +351,7 @@ object Dialogs {
                     val v = ui.text("Aa  $name", 14f, c, bold = true).apply {
                         gravity = Gravity.CENTER
                         setPadding(ui.dp(6), ui.dp(12), ui.dp(6), ui.dp(12))
-                        setOnClickListener { WidgetPrefs.setFont(activity, id); paintFont() }
+                        setOnClickListener { WidgetPrefs.setFont(activity, id); paintFont(); ZahraWidget.updateAll(activity) }
                     }
                     fontViews += id to v
                     r.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)) })

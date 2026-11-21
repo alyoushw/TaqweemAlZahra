@@ -28,7 +28,10 @@ enum class WidgetSize(val title: String, val cells: String, val provider: Class<
 
 object WidgetPrefs {
     val BACKGROUNDS = listOf(
-        Triple("glass", "شفاف زجاجي", Color.parseColor("#59000000")),
+        Triple("glass", "شفاف داكن", Color.parseColor("#59000000")),
+        // Light frosted glass without a border, like the home-screen icon folders.
+        Triple("frost", "زجاجي فاتح", Color.parseColor("#38FFFFFF")),
+        Triple("none", "بدون خلفية", Color.parseColor("#00000000")),
         Triple("black", "أسود داكن", Color.parseColor("#F0121212")),
         Triple("maroon", "ماروني زهرائي", Color.parseColor("#F06B1723")),
         Triple("green", "أخضر زمردي", Color.parseColor("#F01B5E3F")),
@@ -50,6 +53,15 @@ object WidgetPrefs {
         Triple("mint", "أخضر فاتح", Color.parseColor("#A5D6A7")),
         Triple("black", "أسود", Color.parseColor("#151515")),
     )
+    /** What the one-row (bar) widget shows besides the date. */
+    val BAR_MODES = listOf(
+        "date" to "التاريخ فقط",
+        "count" to "التاريخ + العد التنازلي للصلاة",
+        "occ" to "التاريخ + مناسبة اليوم",
+        "all" to "التاريخ + العد التنازلي + المناسبة",
+    )
+    fun barMode(ctx: Context) = sp(ctx).getString("widget_bar_mode", "count") ?: "count"
+    fun setBarMode(ctx: Context, m: String) = sp(ctx).edit().putString("widget_bar_mode", m).apply()
     private val DEFAULT_ON = setOf("countdown", "times", "occasion")
     private fun sp(ctx: Context) = ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE)
     fun bg(ctx: Context) = sp(ctx).getString("widget_bg", "glass") ?: "glass"
@@ -90,7 +102,7 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
 
             val fc = WidgetPrefs.fontColor(ctx)
             val soft = (fc and 0x00FFFFFF) or (0xCC shl 24)
-            listOf(R.id.w_title, R.id.w_hijri, R.id.w_next, R.id.w_timer, R.id.w_event, R.id.w_t1, R.id.w_t2, R.id.w_t3, R.id.w_t4, R.id.w_t5)
+            listOf(R.id.w_title, R.id.w_hijri, R.id.w_next, R.id.w_timer, R.id.w_next2, R.id.w_timer2, R.id.w_event, R.id.w_t1, R.id.w_t2, R.id.w_t3, R.id.w_t4, R.id.w_t5)
                 .forEach { v.setTextColor(it, fc) }
             listOf(R.id.w_greg, R.id.w_extra).forEach { v.setTextColor(it, soft) }
 
@@ -101,6 +113,9 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
 
             v.setViewVisibility(R.id.w_title, if (bar || small) View.GONE else View.VISIBLE)
             v.setViewVisibility(R.id.w_gear, if (bar) View.GONE else View.VISIBLE)
+            val barMode = WidgetPrefs.barMode(ctx)
+            val barCount = bar && (barMode == "count" || barMode == "all")
+            val barOcc = bar && (barMode == "occ" || barMode == "all")
             v.setTextViewTextSize(R.id.w_hijri, android.util.TypedValue.COMPLEX_UNIT_SP, if (large) 21f else if (small) 15f else 18f)
 
             if (day == null) {
@@ -120,7 +135,7 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
 
                 val tomorrow = CalendarData.byDate(ctx, day.greg.plusDays(1))
                 val tonight = if (Prefs.occasionMode(ctx) == Prefs.OCC_BEFORE && tomorrow != null && Notifier.isReligious(tomorrow)) tomorrow else null
-                val showOcc = WidgetPrefs.on(ctx, "occasion") && !bar && (day.occasions.isNotEmpty() || tonight != null)
+                val showOcc = (if (bar) barOcc else WidgetPrefs.on(ctx, "occasion")) && (day.occasions.isNotEmpty() || tonight != null)
                 v.setViewVisibility(R.id.w_event, if (showOcc) View.VISIBLE else View.GONE)
                 val todayText = day.occasions.joinToString(" / ") { it.text }
                 v.setTextViewText(
@@ -128,7 +143,7 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
                     if (tonight == null) todayText
                     else (if (todayText.isNotBlank()) "اليوم: $todayText\n" else "") + "الليلة: " + tonight.occasions.joinToString(" / ") { it.text },
                 )
-                v.setInt(R.id.w_event, "setMaxLines", if (large) 4 else if (small || tonight != null) 2 else 1)
+                v.setInt(R.id.w_event, "setMaxLines", if (bar) 1 else if (large) 4 else if (small || tonight != null) 2 else 1)
 
                 val extras = buildList {
                     if (WidgetPrefs.on(ctx, "hijama")) {
@@ -155,14 +170,18 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
             }
 
             val next = CalendarData.nextPrayer(ctx)
-            val showCount = WidgetPrefs.on(ctx, "countdown") && next != null
+            val showCount = !bar && WidgetPrefs.on(ctx, "countdown") && next != null
             v.setViewVisibility(R.id.w_count_row, if (showCount) View.VISIBLE else View.GONE)
+            v.setViewVisibility(R.id.w_count_inline, if (barCount && next != null) View.VISIBLE else View.GONE)
             if (next != null) {
                 val label = "صلاة ${next.prayer.label}"
                 v.setTextViewText(R.id.w_next, "⏳ باقي على $label:")
+                v.setTextViewText(R.id.w_next2, "⏳ ${next.prayer.label}")
                 val remaining = Duration.between(LocalDateTime.now(), next.at).toMillis()
-                v.setChronometer(R.id.w_timer, SystemClock.elapsedRealtime() + remaining, null, true)
-                v.setChronometerCountDown(R.id.w_timer, true)
+                listOf(R.id.w_timer, R.id.w_timer2).forEach {
+                    v.setChronometer(it, SystemClock.elapsedRealtime() + remaining, null, true)
+                    v.setChronometerCountDown(it, true)
+                }
             }
 
             val open = PendingIntent.getActivity(

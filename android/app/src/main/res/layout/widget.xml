@@ -45,6 +45,35 @@
                 android:textColor="#E6FFFFFF"
                 android:textSize="12sp" />
 
+            <!-- Bar widget: the countdown sits on the date line, at the far side. -->
+            <LinearLayout
+                android:id="@+id/w_count_inline"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end|center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/w_next2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:textColor="#F3C94E"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <Chronometer
+                    android:id="@+id/w_timer2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:textColor="#F3C94E"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/w_gear"
                 android:layout_width="wrap_content"

@@ -1,6 +1,6 @@
 {
-  "versionCode": 25,
-  "versionName": "3.9.9",
+  "versionCode": 26,
+  "versionName": "3.10.0",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "مشاركة تفاصيل اليوم كصورة. وإيقاف الأذان بأزرار الصوت (حتى والشاشة مطفية)، أو بزر التشغيل أثناء ما صفحة الأذان مضيئة."
+  "notes": "الودجت الشريطي (4×1) صار له خيارات: التاريخ فقط، أو مع العد التنازلي للصلاة، أو مع المناسبة، أو الكل. وخلفيات جديدة: زجاجي فاتح بدون حدود مثل الأيقونات، وبدون خلفية."
 }

@@ -43,6 +43,31 @@ enum class AdhanVoice(val id: String, val title: String, val res: Int) {
  */
 class AdhanService : Service() {
     private var player: MediaPlayer? = null
+    private var session: android.media.session.MediaSession? = null
+
+    /**
+     * The volume buttons stop the adhan (like an alarm clock), even with the screen off: a media session
+     * whose "volume" is ours, so a press reaches us instead of changing the phone's volume.
+     */
+    private fun listenToVolumeKeys() {
+        if (session != null) return
+        session = runCatching {
+            android.media.session.MediaSession(this, "adhan").apply {
+                setPlaybackToRemote(object : android.media.VolumeProvider(VOLUME_CONTROL_RELATIVE, 10, 5) {
+                    override fun onAdjustVolume(direction: Int) { if (direction != 0) stopByKey() }
+                })
+                setPlaybackState(android.media.session.PlaybackState.Builder()
+                    .setState(android.media.session.PlaybackState.STATE_PLAYING, 0, 1f).build())
+                isActive = true
+            }
+        }.getOrNull()
+    }
+
+    private fun stopByKey() {
+        stopAll()
+        PrayerAlert.clear(this)
+        sendBroadcast(Intent(ACTION_STOPPED).setPackage(packageName))
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -77,6 +102,7 @@ class AdhanService : Service() {
                 start()
             }
         }.getOrNull()
+        if (player != null) { playing = true; listenToVolumeKeys() }
         if (player == null) stopAll(keepNotification = true, title = title, text = text)
         return START_NOT_STICKY
     }
@@ -99,6 +125,8 @@ class AdhanService : Service() {
     private fun stopAll(keepNotification: Boolean = false, title: String = "", text: String = "") {
         player?.release()
         player = null
+        playing = false
+        session?.release(); session = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         if (keepNotification) {
             // Leave a normal, dismissible notification behind once the adhan finishes.
@@ -113,6 +141,8 @@ class AdhanService : Service() {
     override fun onDestroy() {
         player?.release()
         player = null
+        playing = false
+        session?.release(); session = null
         super.onDestroy()
     }
 
@@ -120,6 +150,9 @@ class AdhanService : Service() {
         const val CHANNEL = "adhan_voice"
         private const val NOTIF_ID = 300
         const val ACTION_STOP = "com.alzahra.taqweem.STOP_ADHAN"
+        /** Sent when a volume button stopped the adhan, so the full-screen page closes too. */
+        const val ACTION_STOPPED = "com.alzahra.taqweem.ADHAN_STOPPED"
+        @Volatile var playing = false
         const val EXTRA_VOICE = "voice"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"

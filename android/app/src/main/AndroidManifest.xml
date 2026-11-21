@@ -47,6 +47,12 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <receiver
             android:name=".InstallReceiver"
             android:exported="false" />

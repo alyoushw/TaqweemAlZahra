@@ -434,6 +434,7 @@ object Dialogs {
                 head.addView(ui.text(sb, 16.5f, Colors.TEXT, bold = true).apply { setPadding(0, ui.dp(12), 0, 0); setLineSpacing(0f, 1.3f) })
             }
             col.addView(head)
+            val pictured = mutableListOf<View>(head) // what goes into the shared picture
 
             // Times
             val t = d.times
@@ -453,6 +454,7 @@ object Dialogs {
                 times.addView(row)
             }
             col.addView(times)
+            pictured += times
 
             // Other columns as small pills
             val info2 = listOf("عقد النكاح" to d.mark, "السكن" to d.sakan, "الحجامة" to d.hijama, "الطالع" to d.tale).filter { it.second.isNotBlank() }
@@ -467,12 +469,17 @@ object Dialogs {
                     }, ui.weight().apply { setMargins(ui.dp(3), ui.dp(3), ui.dp(3), ui.dp(3)) })
                 }
                 col.addView(row)
+                pictured += row
             }
 
             // Share
             val text = shareText(d)
-            val sr = ui.row().apply { setPadding(0, ui.dp(8), 0, 0) }
-            sr.addView(ui.primaryButton("مشاركة") {
+            col.addView(ui.primaryButton("🖼  مشاركة كصورة") {
+                ShareImage.share(activity, pictured, Colors.BG,
+                    "تقويم الزهراء - الأحساء ${CalendarData.ar(CalendarData.YEAR)}هـ", "مشاركة اليوم كصورة")
+            }, ui.match(3, 10, 3, 0))
+            val sr = ui.row().apply { setPadding(0, ui.dp(6), 0, 0) }
+            sr.addView(ui.outlineButton("مشاركة كنص") {
                 activity.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }, "مشاركة اليوم"))
             }, ui.weight().apply { setMargins(ui.dp(3), 0, ui.dp(3), 0) })
             sr.addView(ui.primaryButton("واتساب") {

@@ -199,19 +199,62 @@ class AdhanActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
         else @Suppress("DEPRECATION") window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
         render(intent)
+        // Registered for the page's whole life: the screen-off broadcast can arrive after onStop.
+        val f = android.content.IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(AdhanService.ACTION_STOPPED) }
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(keysReceiver, f, RECEIVER_NOT_EXPORTED) else registerReceiver(keysReceiver, f)
     }
 
     private val screenTimer = android.os.Handler(android.os.Looper.getMainLooper())
+    /** Until this moment the page holds the screen on, so the screen can only go dark by the power button. */
+    private var holdUntil = 0L
+    private var snoozedPage = false
 
     /** Keep the screen lit for a few seconds only; then the phone may turn it off (the adhan keeps playing). */
     private fun keepScreenBriefly() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        holdUntil = System.currentTimeMillis() + PrayerAlert.SCREEN_ON_MS
         screenTimer.removeCallbacksAndMessages(null)
         screenTimer.postDelayed({ window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }, PrayerAlert.SCREEN_ON_MS)
     }
 
+    /** Stop the adhan with the power or volume buttons, like an alarm clock. */
+    private fun stopByButton() {
+        if (snoozedPage) { PrayerAlert.clear(this); finish(); return }
+        AdhanService.stop(this); PrayerAlert.clear(this); finish()
+    }
+
+    private val keysReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            when (i.action) {
+                // Screen went dark while we were holding it on: that was the power button.
+                Intent.ACTION_SCREEN_OFF -> if (System.currentTimeMillis() < holdUntil - 300) stopByButton()
+                AdhanService.ACTION_STOPPED -> finish()
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Stopped meanwhile (volume button, notification): nothing left to show.
+        if (!snoozedPage && !AdhanService.playing && intent?.getBooleanExtra(PrayerAlert.EXTRA_SNOOZED, false) == false &&
+            System.currentTimeMillis() > holdUntil) finish()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        keepScreenBriefly() // touching the page keeps it lit (and the power button active) a little longer
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) {
+            stopByButton(); return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onDestroy() {
         screenTimer.removeCallbacksAndMessages(null)
+        runCatching { unregisterReceiver(keysReceiver) }
         super.onDestroy()
     }
 
@@ -236,6 +279,7 @@ class AdhanActivity : Activity() {
         val p = i.getStringExtra(PrayerAlert.EXTRA_PRAYER)?.let { runCatching { Prayer.valueOf(it) }.getOrNull() } ?: Prayer.DHUHR
         val time = i.getStringExtra(PrayerAlert.EXTRA_TIME) ?: ""
         val snoozed = i.getBooleanExtra(PrayerAlert.EXTRA_SNOOZED, false)
+        snoozedPage = snoozed
         val delay = i.getIntExtra(PrayerAlert.EXTRA_DELAY, 0).let { if (snoozed && it == 0) PrayerAlert.SNOOZE_MIN else it }
         keepScreenBriefly()
         val day = CalendarData.byDate(this, LocalDate.now())

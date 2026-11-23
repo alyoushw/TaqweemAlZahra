@@ -125,10 +125,11 @@ object AlarmScheduler {
     private const val KIND_OCCASION = "occasion"
     private const val KIND_REFRESH = "refresh"
     private const val KIND_EVE = "eve"
-    private val OCCASION_TIME: LocalTime = LocalTime.of(7, 0)
+    private val OCCASION_TIME: LocalTime = LocalTime.of(9, 0)
     private val EVE_TIME: LocalTime = LocalTime.of(19, 0)
-    /** The night of the occasion begins at maghrib: remind 20 minutes after it (after the adhan). */
-    fun eveTime(day: Day): LocalTime = CalendarData.timeOf(day, Prayer.MAGHRIB)?.plusMinutes(20) ?: EVE_TIME
+    /** «الليلة» reminder: 9 in the morning of the day before, so the night's occasion is known in good time. */
+    @Suppress("UNUSED_PARAMETER")
+    fun eveTime(day: Day): LocalTime = LocalTime.of(9, 0)
 
     private data class Next(val at: LocalDateTime, val kind: String, val prayer: Prayer? = null, val label: String = "")
 

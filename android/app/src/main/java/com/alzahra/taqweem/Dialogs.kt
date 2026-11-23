@@ -179,9 +179,9 @@ object Dialogs {
             v.background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
         }
         listOf(
-            Prefs.OCC_BOTH to "ليلة المناسبة بعد المغرب + صباح يومها (٧ صباحاً)",
-            Prefs.OCC_BEFORE to "ليلة المناسبة فقط (بعد المغرب بعشرين دقيقة)",
-            Prefs.OCC_SAME to "صباح يوم المناسبة فقط (٧ صباحاً)",
+            Prefs.OCC_BOTH to "يوم ليلة المناسبة + يوم المناسبة (٩ صباحاً)",
+            Prefs.OCC_BEFORE to "يوم ليلة المناسبة فقط (٩ صباحاً)",
+            Prefs.OCC_SAME to "يوم المناسبة فقط (٩ صباحاً)",
             Prefs.OCC_OFF to "بدون تذكير",
         ).forEach { (id, title) ->
             val v = ui.text(title, 15f, Colors.TEXT, bold = true).apply {
@@ -207,11 +207,9 @@ object Dialogs {
             val d = nextOccasion()
             nextInfo.text = if (d == null) "لا توجد مناسبات دينية قادمة في هذه السنة" else {
                 val icon = if (d.isSorrow) "🏴" else "🌸"
-                val eveDay = CalendarData.byDate(activity, d.greg.minusDays(1))
                 val e = d.greg.minusDays(1)
-                val eveText = "ليلة ${CalendarData.WEEKDAYS[d.greg.dayOfWeek.value]} (${e.dayOfMonth}/${e.monthValue}) الساعة " +
-                    (eveDay?.let { AlarmScheduler.eveTime(it) }?.let { "${if (it.hour > 12) it.hour - 12 else it.hour}:${"%02d".format(java.util.Locale.US, it.minute)} مساءً" } ?: "٧ مساءً")
-                val mornText = "${CalendarData.weekday(d)} ${d.greg.dayOfMonth}/${d.greg.monthValue} الساعة ٧ صباحاً"
+                val eveText = "${CalendarData.WEEKDAYS[e.dayOfWeek.value]} ${e.dayOfMonth}/${e.monthValue} (يوم ليلة المناسبة) الساعة ٩ صباحاً"
+                val mornText = "${CalendarData.weekday(d)} ${d.greg.dayOfMonth}/${d.greg.monthValue} الساعة ٩ صباحاً"
                 val whenText = when (Prefs.occasionMode(activity)) {
                     Prefs.OCC_BEFORE -> eveText
                     Prefs.OCC_SAME -> mornText

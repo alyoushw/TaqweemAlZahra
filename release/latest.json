@@ -1,6 +1,6 @@
 {
-  "versionCode": 28,
-  "versionName": "3.10.2",
+  "versionCode": 29,
+  "versionName": "3.10.3",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "تذكير المناسبات صار الساعة ٩ الصبح: تذكير «الليلة» في اليوم اللي قبل المناسبة، وتذكير يوم المناسبة نفسه."
+  "notes": "خريطة القبلة: تقدر تلف الخريطة بإصبعين وتكبّرها وتحركها بدون ما تلف الجوال، وزر البوصلة الصغير فوق يرجّع الشمال للأعلى."
 }

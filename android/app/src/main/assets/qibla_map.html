@@ -2,16 +2,51 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="stylesheet" href="leaflet/leaflet.css">
 <style>
-html,body,#map{margin:0;height:100%;background:#1b1b1b}
+html,body{margin:0;height:100%;background:#1b1b1b;overflow:hidden;touch-action:none}
+#wrap{position:fixed;inset:0;overflow:hidden}
+/* The map is a square as large as the screen's diagonal, so turning it never shows empty corners. */
+#map{position:absolute;background:#1b1b1b;transform-origin:50% 50%}
+#north{position:fixed;top:12px;left:12px;width:46px;height:46px;border-radius:50%;background:#000a;border:2px solid #D4A92F;z-index:1000;display:flex;align-items:center;justify-content:center}
+#north svg{width:30px;height:30px}
 .kaaba{width:34px;height:34px;border-radius:50%;background:#111;border:3px solid #D4A92F;box-shadow:0 2px 8px #0008;position:relative}
 .kaaba:after{content:'';position:absolute;left:7px;right:7px;top:12px;height:4px;background:#D4A92F}
 .me{width:20px;height:20px;border-radius:50%;background:#1E88E5;border:4px solid #fff;box-shadow:0 0 0 2px #1E88E5aa,0 2px 8px #0008}
 .leaflet-control-attribution{font-size:9px}
-</style></head><body><div id="map"></div>
+</style></head><body><div id="wrap"><div id="map"></div></div>
+<div id="north" onclick="northUp()" title="الشمال للأعلى"><svg viewBox="0 0 30 30"><path d="M15 2 L20 15 L15 13 L10 15Z" fill="#E53935"/><path d="M15 28 L20 15 L15 17 L10 15Z" fill="#fff"/><text x="15" y="10" font-size="0" fill="#fff">N</text></svg></div>
 <script src="leaflet/leaflet.js"></script>
 <script>
 var KAABA=[21.4224779,39.8251832];
-var map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:20}).setView(KAABA,17);
+var bearing=0; // degrees the map is turned (by the user's two fingers)
+function sizeMap(){var w=innerWidth,h=innerHeight,d=Math.ceil(Math.sqrt(w*w+h*h)),m=document.getElementById('map');
+ m.style.width=m.style.height=d+'px';m.style.left=((w-d)/2)+'px';m.style.top=((h-d)/2)+'px';}
+sizeMap();
+// Leaflet's own gestures are off: the page handles one-finger pan and two-finger zoom + rotate itself.
+var map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:20,zoomSnap:0,dragging:false,touchZoom:false,doubleClickZoom:false,scrollWheelZoom:false,boxZoom:false,keyboard:false,tap:false}).setView(KAABA,17);
+addEventListener('resize',function(){sizeMap();map.invalidateSize({pan:false});});
+function applyBearing(){document.getElementById('map').style.transform='rotate('+bearing+'deg)';
+ document.querySelector('#north svg').style.transform='rotate('+bearing+'deg)';}
+function northUp(){bearing=0;applyBearing();}
+(function(){var t0=null;
+ function pts(e){return Array.prototype.map.call(e.touches,function(t){return{x:t.clientX,y:t.clientY};});}
+ function pan(dx,dy){ // a finger moved (dx,dy) on screen: move the map the same way, undoing its rotation
+  var a=-bearing*Math.PI/180,mx=dx*Math.cos(a)-dy*Math.sin(a),my=dx*Math.sin(a)+dy*Math.cos(a);
+  map.panBy([-mx,-my],{animate:false});}
+ var w=document.getElementById('wrap');
+ w.addEventListener('touchstart',function(e){t0={p:pts(e),z:map.getZoom(),b:bearing};},{passive:false});
+ w.addEventListener('touchmove',function(e){e.preventDefault();var p=pts(e);if(!t0)return;
+  if(p.length===1&&t0.p.length===1){pan(p[0].x-t0.p[0].x,p[0].y-t0.p[0].y);t0.p=p;}
+  else if(p.length>=2&&t0.p.length>=2){
+   var a0=Math.atan2(t0.p[1].y-t0.p[0].y,t0.p[1].x-t0.p[0].x),a1=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);
+   var d0=Math.hypot(t0.p[1].x-t0.p[0].x,t0.p[1].y-t0.p[0].y),d1=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);
+   var c0={x:(t0.p[0].x+t0.p[1].x)/2,y:(t0.p[0].y+t0.p[1].y)/2},c1={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};
+   bearing=t0.b+(a1-a0)*180/Math.PI;applyBearing();
+   if(d0>10){var z=Math.max(3,Math.min(20,t0.z+Math.log2(d1/d0)));map.setZoom(z,{animate:false});}
+   pan(c1.x-c0.x,c1.y-c0.y);
+   t0={p:p,z:map.getZoom(),b:bearing};}
+  else t0={p:p,z:map.getZoom(),b:bearing};},{passive:false});
+ w.addEventListener('touchend',function(e){t0=e.touches.length?{p:pts(e),z:map.getZoom(),b:bearing}:null;});
+})();
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Esri, Maxar'}).addTo(map);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,opacity:.9}).addTo(map);
 L.marker(KAABA,{icon:L.divIcon({className:'',html:'<div class="kaaba"></div>',iconSize:[34,34],iconAnchor:[17,17]})}).addTo(map);

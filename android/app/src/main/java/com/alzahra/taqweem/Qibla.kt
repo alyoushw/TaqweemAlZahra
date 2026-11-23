@@ -221,10 +221,20 @@ object Qibla {
         panel.addView(android.widget.HorizontalScrollView(activity).apply { isHorizontalScrollBarEnabled = false; layoutDirection = View.LAYOUT_DIRECTION_RTL; addView(btns) })
         val mapHelp = ui.text("الخط الأصفر هو اتجاه القبلة من مكان وقوفك. قرّب الخريطة حتى ترى المبنى، وقارن الخط بالجدران أو الشارع لتعرف الاتجاه بدقة بدون الاعتماد على البوصلة.", 12f, Color.parseColor("#B3FFFFFF")).apply { setPadding(0, ui.dp(10), 0, 0) }
         panel.addView(mapHelp)
-        // Sideways there is little height: hide the help text so the map stays visible.
+        // Sideways there is little height: the info card moves to one side (map visible beside it) and the
+        // help text hides; upright it goes back across the bottom.
+        var mapLand: Boolean? = null
         mapBox.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-            val vis = if (v.width > v.height * 1.15f) View.GONE else View.VISIBLE
-            if (mapHelp.visibility != vis) v.post { mapHelp.visibility = vis }
+            val land = v.width > v.height * 1.15f
+            if (land == mapLand || v.width == 0) return@addOnLayoutChangeListener
+            mapLand = land
+            v.post {
+                mapHelp.visibility = if (land) View.GONE else View.VISIBLE
+                sub.visibility = if (land) View.GONE else View.VISIBLE
+                panel.layoutParams = if (land)
+                    FrameLayout.LayoutParams((v.width * 0.42f).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.RIGHT).apply { setMargins(ui.dp(10), 0, ui.dp(10), ui.dp(10)) }
+                else FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM).apply { setMargins(ui.dp(10), 0, ui.dp(10), ui.dp(10)) }
+            }
         }
         mapBox.addView(panel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM).apply { setMargins(ui.dp(10), 0, ui.dp(10), ui.dp(10)) })
 

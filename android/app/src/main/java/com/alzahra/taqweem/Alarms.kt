@@ -28,9 +28,13 @@ object Prefs {
     const val OCC_SAME = "same"
     const val OCC_BEFORE = "before"
     const val OCC_OFF = "off"
-    /** How religious occasions are reminded: on the day, the evening before, or not at all. */
+    /** Both: the night before (the Islamic day starts at maghrib) and again in the morning. Default. */
+    const val OCC_BOTH = "both"
+    /** How religious occasions are reminded: the night before, in the morning, both, or not at all. */
     fun occasionMode(ctx: Context): String = sp(ctx).getString("occasion_mode", null)
-        ?: if (sp(ctx).getBoolean("notify_occasion", true)) OCC_SAME else OCC_OFF
+        ?: if (sp(ctx).getBoolean("notify_occasion", true)) OCC_BOTH else OCC_OFF
+    fun remindsEve(ctx: Context) = occasionMode(ctx).let { it == OCC_BEFORE || it == OCC_BOTH }
+    fun remindsMorning(ctx: Context) = occasionMode(ctx).let { it == OCC_SAME || it == OCC_BOTH }
     fun setOccasionMode(ctx: Context, m: String) = sp(ctx).edit().putString("occasion_mode", m).apply()
 
     fun lastUpdateCheck(ctx: Context) = sp(ctx).getLong("last_update_check", 0L)
@@ -123,6 +127,8 @@ object AlarmScheduler {
     private const val KIND_EVE = "eve"
     private val OCCASION_TIME: LocalTime = LocalTime.of(7, 0)
     private val EVE_TIME: LocalTime = LocalTime.of(19, 0)
+    /** The night of the occasion begins at maghrib: remind 20 minutes after it (after the adhan). */
+    fun eveTime(day: Day): LocalTime = CalendarData.timeOf(day, Prayer.MAGHRIB)?.plusMinutes(20) ?: EVE_TIME
 
     private data class Next(val at: LocalDateTime, val kind: String, val prayer: Prayer? = null, val label: String = "")
 
@@ -138,12 +144,10 @@ object AlarmScheduler {
                 candidates += if (Prefs.prayerOn(ctx, p)) Next(date.atTime(t), KIND_PRAYER, p, rawTime(day, p))
                 else Next(date.atTime(t), KIND_REFRESH)
             }
-            when (Prefs.occasionMode(ctx)) {
-                Prefs.OCC_SAME -> if (Notifier.isReligious(day)) candidates += Next(date.atTime(OCCASION_TIME), KIND_OCCASION)
-                Prefs.OCC_BEFORE -> {
-                    val tomorrow = CalendarData.byDate(ctx, date.plusDays(1))
-                    if (tomorrow != null && Notifier.isReligious(tomorrow)) candidates += Next(date.atTime(EVE_TIME), KIND_EVE)
-                }
+            if (Prefs.remindsMorning(ctx) && Notifier.isReligious(day)) candidates += Next(date.atTime(OCCASION_TIME), KIND_OCCASION)
+            if (Prefs.remindsEve(ctx)) {
+                val tomorrow = CalendarData.byDate(ctx, date.plusDays(1))
+                if (tomorrow != null && Notifier.isReligious(tomorrow)) candidates += Next(date.atTime(eveTime(day)), KIND_EVE)
             }
         }
         return candidates.filter { it.at.isAfter(now.plusSeconds(5)) }.minByOrNull { it.at }

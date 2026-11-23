@@ -226,8 +226,8 @@ class MainActivity : Activity() {
         val now = CalendarData.currentMonth(this)
         when {
             tab == 2 -> pagesWeb?.let { PagesView.scrollTo(it, now); pagesBar?.select(now) }
-            tab == 0 && month == now && tableWeb != null -> tableWeb?.let { w -> w.evaluateJavascript("goToday()") { TableWeb.toRightEdge(w) } }
-            else -> { month = now; selectTab(tab) }
+            tab == 0 && month == now && tableWeb != null -> tableWeb?.let { w -> TableWeb.showToday(w, true) }
+            else -> { month = now; if (tab == 0) TableWeb.flashOnLoad = true; selectTab(tab) }
         }
     }
 

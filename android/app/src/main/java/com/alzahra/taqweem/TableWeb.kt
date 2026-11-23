@@ -90,6 +90,8 @@ table{border-collapse:separate;border-spacing:0;background:$cCard;border:2px sol
 th{position:sticky;top:0;z-index:2;background:$cHead;color:#fff;font-size:15px;padding:10px 8px;border-left:1px solid ${hex(t.accent)};border-bottom:2px solid ${hex(t.accent)};line-height:1.25}
 td{font-size:16px;font-weight:bold;text-align:center;padding:0 6px;height:52px;border-left:1px solid $cLine;border-bottom:1px solid $cLine;color:$cText}
 tr.alt td{background:$cAlt}
+@keyframes fl{0%,100%{filter:none}25%,75%{filter:brightness(1.35)}50%{filter:brightness(0.8)}}
+tr.today.flash td{animation:fl 1.2s ease 2}
 tr.today td{background:${hex(t.todayRow)};border-top:2px solid $cToday;border-bottom:2px solid $cToday}
 td.ev{text-align:right;min-width:430px;white-space:normal;line-height:1.35;font-size:15.5px;padding:4px 10px}
 th.ev{min-width:430px}
@@ -107,7 +109,9 @@ th.ev{min-width:430px}
 <table dir="rtl"><thead><tr>$head</tr></thead><tbody>$rows
 <tr class="note"><td colspan="$colCount">$note</td></tr></tbody></table>
 <script>
-function goToday(){var e=document.querySelector('tr.today');var y=0;if(e){y=Math.max(0,e.getBoundingClientRect().top+window.scrollY-120);}window.scrollTo(document.documentElement.scrollWidth,y);}
+function todayY(){var e=document.querySelector('tr.today');return e?Math.max(0,e.getBoundingClientRect().top+window.scrollY-120):0;}
+function goToday(){window.scrollTo(document.documentElement.scrollWidth,todayY());}
+function flashToday(){var e=document.querySelector('tr.today');if(!e)return;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}
 </script>
 </body></html>"""
     }
@@ -115,6 +119,22 @@ function goToday(){var e=document.querySelector('tr.today');var y=0;if(e){y=Math
     /** Show the weekday side (the table's right edge) first. */
     fun toRightEdge(view: WebView) {
         view.post { view.scrollTo(1_000_000, view.scrollY) }
+    }
+
+    /**
+     * Scroll to today's row (weekday side) and make it blink once. The vertical position comes from the
+     * page, the scrolling is done here, so the two scrolls can't undo each other.
+     */
+    /** Set by «اليوم» when it opens another month: the new table blinks today's row once it loads. */
+    @Volatile var flashOnLoad = false
+
+    @Suppress("DEPRECATION")
+    fun showToday(view: WebView, flash: Boolean) {
+        view.evaluateJavascript("todayY()") { res ->
+            val y = res?.toFloatOrNull() ?: 0f
+            view.scrollTo(1_000_000, (y * view.scale).toInt())
+            if (flash) view.evaluateJavascript("flashToday()", null)
+        }
     }
 
     class Bridge(private val activity: Activity, private val month: Int) {
@@ -140,7 +160,10 @@ function goToday(){var e=document.querySelector('tr.today');var y=0;if(e){y=Math
         var base = 0f
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
-                view.postDelayed({ view.evaluateJavascript("goToday()") { toRightEdge(view) } }, 120)
+                // Twice: the second time catches slow phones where the page wasn't laid out yet.
+                view.postDelayed({ showToday(view, false) }, 150)
+                val flash = flashOnLoad; flashOnLoad = false
+                view.postDelayed({ showToday(view, flash) }, 700)
             }
             override fun onScaleChanged(view: WebView, oldScale: Float, newScale: Float) {
                 if (base == 0f) base = oldScale

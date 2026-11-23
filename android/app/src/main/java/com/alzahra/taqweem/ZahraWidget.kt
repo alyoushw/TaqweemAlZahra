@@ -134,7 +134,7 @@ open class ZahraWidget(private val size: WidgetSize) : AppWidgetProvider() {
                 v.setTextViewText(R.id.w_hijri, span)
 
                 val tomorrow = CalendarData.byDate(ctx, day.greg.plusDays(1))
-                val tonight = if (Prefs.occasionMode(ctx) == Prefs.OCC_BEFORE && tomorrow != null && Notifier.isReligious(tomorrow)) tomorrow else null
+                val tonight = if (Prefs.remindsEve(ctx) && tomorrow != null && Notifier.isReligious(tomorrow)) tomorrow else null
                 val showOcc = (if (bar) barOcc else WidgetPrefs.on(ctx, "occasion")) && (day.occasions.isNotEmpty() || tonight != null)
                 v.setViewVisibility(R.id.w_event, if (showOcc) View.VISIBLE else View.GONE)
                 val todayText = day.occasions.joinToString(" / ") { it.text }

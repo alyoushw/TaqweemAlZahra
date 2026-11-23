@@ -179,8 +179,9 @@ object Dialogs {
             v.background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
         }
         listOf(
-            Prefs.OCC_SAME to "تذكير في نفس اليوم (٧ صباحاً)",
-            Prefs.OCC_BEFORE to "تذكير قبل المناسبة بيوم (ليلة المناسبة ٧ مساءً)",
+            Prefs.OCC_BOTH to "ليلة المناسبة بعد المغرب + صباح يومها (٧ صباحاً)",
+            Prefs.OCC_BEFORE to "ليلة المناسبة فقط (بعد المغرب بعشرين دقيقة)",
+            Prefs.OCC_SAME to "صباح يوم المناسبة فقط (٧ صباحاً)",
             Prefs.OCC_OFF to "بدون تذكير",
         ).forEach { (id, title) ->
             val v = ui.text(title, 15f, Colors.TEXT, bold = true).apply {
@@ -192,7 +193,7 @@ object Dialogs {
             col.addView(v, ui.match(0, 3, 0, 3))
         }
         paintModes()
-        col.addView(ui.text("عند اختيار «قبل المناسبة بيوم» يعرض الودجت مناسبة اليوم ومناسبة الليلة (مناسبة الغد).", 12f, Colors.MUTED).apply { setPadding(0, ui.dp(4), 0, 0) })
+        col.addView(ui.text("مع تذكير الليلة يعرض الودجت مناسبة اليوم ومناسبة الليلة (مناسبة الغد).", 12f, Colors.MUTED).apply { setPadding(0, ui.dp(4), 0, 0) })
         // Next religious occasion and when its reminder will arrive, plus a test button.
         val nextInfo = ui.text("", 14f, Colors.TEXT, bold = true).apply {
             setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
@@ -206,9 +207,15 @@ object Dialogs {
             val d = nextOccasion()
             nextInfo.text = if (d == null) "لا توجد مناسبات دينية قادمة في هذه السنة" else {
                 val icon = if (d.isSorrow) "🏴" else "🌸"
+                val eveDay = CalendarData.byDate(activity, d.greg.minusDays(1))
+                val e = d.greg.minusDays(1)
+                val eveText = "ليلة ${CalendarData.WEEKDAYS[d.greg.dayOfWeek.value]} (${e.dayOfMonth}/${e.monthValue}) الساعة " +
+                    (eveDay?.let { AlarmScheduler.eveTime(it) }?.let { "${if (it.hour > 12) it.hour - 12 else it.hour}:${"%02d".format(java.util.Locale.US, it.minute)} مساءً" } ?: "٧ مساءً")
+                val mornText = "${CalendarData.weekday(d)} ${d.greg.dayOfMonth}/${d.greg.monthValue} الساعة ٧ صباحاً"
                 val whenText = when (Prefs.occasionMode(activity)) {
-                    Prefs.OCC_BEFORE -> { val e = d.greg.minusDays(1); "${CalendarData.WEEKDAYS[e.dayOfWeek.value]} ${e.dayOfMonth}/${e.monthValue} الساعة ٧ مساءً" }
-                    Prefs.OCC_SAME -> "${CalendarData.weekday(d)} ${d.greg.dayOfMonth}/${d.greg.monthValue} الساعة ٧ صباحاً"
+                    Prefs.OCC_BEFORE -> eveText
+                    Prefs.OCC_SAME -> mornText
+                    Prefs.OCC_BOTH -> "$eveText\nو $mornText"
                     else -> "التذكير متوقف"
                 }
                 "المناسبة القادمة: $icon ${d.occasions.first().text}\n${CalendarData.weekday(d)} ${CalendarData.hijriLabel(d)}\n⏰ موعد التذكير: $whenText"

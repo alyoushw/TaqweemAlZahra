@@ -1,6 +1,6 @@
 {
-  "versionCode": 29,
-  "versionName": "3.10.3",
+  "versionCode": 30,
+  "versionName": "3.10.4",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "خريطة القبلة: تقدر تلف الخريطة بإصبعين وتكبّرها وتحركها بدون ما تلف الجوال، وزر البوصلة الصغير فوق يرجّع الشمال للأعلى."
+  "notes": "خريطة القبلة: اللف والتكبير بإصبعين صار سلس بدون ما تسوّد الشاشة أثناء الحركة."
 }

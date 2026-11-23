@@ -1,6 +1,6 @@
 {
-  "versionCode": 30,
-  "versionName": "3.10.4",
+  "versionCode": 31,
+  "versionName": "3.11.0",
   "apkUrl": "https://github.com/alyoushw/TaqweemAlZahra/raw/claude/zahra-calendar-errors-91f4b1/release/taqweem-alzahra.apk",
-  "notes": "خريطة القبلة: اللف والتكبير بإصبعين صار سلس بدون ما تسوّد الشاشة أثناء الحركة."
+  "notes": "نمط خريطة القبلة في الإعدادات: يدوي، أو تتبّع الاتجاه (الخريطة تلف مع الجوال وسهم لف يمين/يسار واهتزاز على القبلة)، أو تتبّع مع تصحيح البوصلة بجدار بيتك."
 }

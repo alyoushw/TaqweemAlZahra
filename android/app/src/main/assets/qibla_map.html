@@ -8,11 +8,23 @@ html,body{margin:0;height:100%;background:#1b1b1b;overflow:hidden;touch-action:n
 #map{position:absolute;background:#1b1b1b;transform-origin:50% 50%}
 #north{position:fixed;top:12px;left:12px;width:46px;height:46px;border-radius:50%;background:#000a;border:2px solid #D4A92F;z-index:1000;display:flex;align-items:center;justify-content:center}
 #north svg{width:30px;height:30px}
+/* Direction tracking: the map turns with the phone; this tells which way to turn. */
+#trk{position:fixed;left:50%;top:70px;transform:translateX(-50%);padding:8px 18px;border-radius:20px;font:bold 18px sans-serif;z-index:1000;display:none;box-shadow:0 3px 12px #0008;white-space:nowrap}
+#phoneTop{position:fixed;left:50%;top:44px;margin-left:-12px;width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:18px solid #fff;z-index:999;display:none;filter:drop-shadow(0 2px 3px #000)}
+#cal{position:fixed;left:10px;right:10px;top:70px;background:#E9C46Af0;color:#2a1a00;border-radius:16px;padding:10px 12px;font:bold 15px sans-serif;line-height:1.5;z-index:1001;display:none}
+#cal .row{display:flex;gap:8px;margin-top:8px}
+#cal button{flex:1;border:0;border-radius:12px;padding:9px;font:bold 15px sans-serif}
+#wall{position:fixed;left:6%;right:6%;top:50%;border-top:3px dashed #fff;z-index:998;display:none;filter:drop-shadow(0 1px 2px #000)}
+#wallLab{position:fixed;left:7%;top:calc(50% - 24px);color:#fff;background:#0009;padding:1px 8px;border-radius:6px;font:12px sans-serif;z-index:998;display:none}
 .kaaba{width:34px;height:34px;border-radius:50%;background:#111;border:3px solid #D4A92F;box-shadow:0 2px 8px #0008;position:relative}
 .kaaba:after{content:'';position:absolute;left:7px;right:7px;top:12px;height:4px;background:#D4A92F}
 .me{width:20px;height:20px;border-radius:50%;background:#1E88E5;border:4px solid #fff;box-shadow:0 0 0 2px #1E88E5aa,0 2px 8px #0008}
 .leaflet-control-attribution{font-size:9px}
 </style></head><body><div id="wrap"><div id="map"></div></div>
+<div id="phoneTop"></div><div id="trk"></div>
+<div id="wall"></div><div id="wallLab">الجدار اللي قدامك</div>
+<div id="cal">📐 لف الخريطة بإصبعين لين جدار بيتك في الصورة يكون موازي للخط الأبيض المتقطع (الجدار اللي قدامك)، ورأس الجوال متجه للجدار.
+<div class="row"><button style="background:#2a1a00;color:#E9C46A" onclick="endCalib(true)">✓ تم التصحيح</button><button style="background:#fff8" onclick="endCalib(false)">إلغاء</button></div></div>
 <div id="north" onclick="northUp()" title="الشمال للأعلى"><svg viewBox="0 0 30 30"><path d="M15 2 L20 15 L15 13 L10 15Z" fill="#E53935"/><path d="M15 28 L20 15 L15 17 L10 15Z" fill="#fff"/><text x="15" y="10" font-size="0" fill="#fff">N</text></svg></div>
 <script src="leaflet/leaflet.js"></script>
 <script>
@@ -27,7 +39,19 @@ addEventListener('resize',function(){sizeMap();map.invalidateSize({pan:false});}
 var vscale=1; // visual zoom while two fingers are down; applied to the map for real when they lift
 function applyBearing(){document.getElementById('map').style.transform='rotate('+bearing+'deg) scale('+vscale+')';
  document.querySelector('#north svg').style.transform='rotate('+bearing+'deg)';}
-function northUp(){bearing=0;applyBearing();}
+function northUp(){if(tracking&&!calibrating)return;bearing=0;applyBearing();}
+var tracking=false,calibrating=false;
+function show(id,on){document.getElementById(id).style.display=on?'block':'none';}
+function setTracking(on){tracking=on;show('phoneTop',on);show('trk',on&&!calibrating);if(on)goMe();}
+// From the app, while tracking: h = heading of the phone's top, diff = degrees still to turn, ok = facing the qibla.
+function track(h,diff,ok){if(!tracking||calibrating)return;bearing=-h;applyBearing();
+ if(pos)map.setView(pos,map.getZoom(),{animate:false});
+ var t=document.getElementById('trk');show('trk',true);
+ if(ok){t.style.background='#2E7D32';t.style.color='#fff';t.textContent='✓ أنت على القبلة';}
+ else{t.style.background='#FF9800';t.style.color='#2a1a00';t.textContent=(diff>0?'↻ لف يمين ':'↺ لف يسار ')+Math.round(Math.abs(diff))+'°';}}
+function startCalib(){calibrating=true;show('trk',false);show('cal',true);show('wall',true);show('wallLab',true);show('phoneTop',true);goMe();}
+function endCalib(ok){calibrating=false;show('cal',false);show('wall',false);show('wallLab',false);show('phoneTop',tracking);
+ if(ok&&window.Q)Q.calibrated(bearing);}
 (function(){var t0=null,g=null; // g: the two-finger gesture in progress
  function commit(){ // fingers lifted: turn the visual zoom into a real zoom (tiles load once, not on every move)
   if(!g)return;var z=Math.max(3,Math.min(20,g.z+Math.log2(vscale)));g=null;vscale=1;applyBearing();map.setZoom(z,{animate:false});}
@@ -44,7 +68,7 @@ function northUp(){bearing=0;applyBearing();}
    var d0=Math.hypot(t0.p[1].x-t0.p[0].x,t0.p[1].y-t0.p[0].y),d1=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);
    var c0={x:(t0.p[0].x+t0.p[1].x)/2,y:(t0.p[0].y+t0.p[1].y)/2},c1={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};
    if(!g)g={z:map.getZoom(),d:d0};
-   bearing=t0.b+(a1-a0)*180/Math.PI;
+   if(!tracking||calibrating)bearing=t0.b+(a1-a0)*180/Math.PI;
    if(g.d>10){var zt=Math.max(3,Math.min(20,g.z+Math.log2(d1/g.d)));vscale=Math.pow(2,zt-g.z);}
    applyBearing();
    pan((c1.x-c0.x)/vscale,(c1.y-c0.y)/vscale);

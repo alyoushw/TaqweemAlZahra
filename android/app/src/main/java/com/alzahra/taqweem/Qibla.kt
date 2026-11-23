@@ -31,6 +31,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import android.widget.TextView
 import kotlin.math.abs
 import kotlin.math.asin
@@ -74,6 +75,38 @@ object Qibla {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("zahra_prefs", Context.MODE_PRIVATE)
     fun style(ctx: Context) = prefs(ctx).getInt("qibla_style", 0)
     fun setStyle(ctx: Context, s: Int) = prefs(ctx).edit().putInt("qibla_style", s).apply()
+
+    /** How the satellite map behaves: 0 turned by hand, 1 turns with the phone, 2 turns with the phone + building correction. */
+    val MAP_MODES = listOf(
+        "يدوي" to "تلف الخريطة وتحركها بإصبعيك بنفسك",
+        "تتبّع الاتجاه" to "الخريطة تلف مع الجوال، وسهم يقول لك لف يمين أو يسار، والجوال يهتز لما تكون على القبلة",
+        "تتبّع + تصحيح بالمبنى" to "مثل التتبّع، ومعه زر «📐 صحّح بالمبنى»: تطابق جدار بيتك مرة وحدة فيصحّح التطبيق انحراف البوصلة",
+    )
+    fun mapMode(ctx: Context) = prefs(ctx).getInt("qibla_map_mode", 0)
+    fun setMapMode(ctx: Context, m: Int) = prefs(ctx).edit().putInt("qibla_map_mode", m).apply()
+    /** Degrees added to the phone's compass, measured against the satellite picture of the user's building. */
+    fun calib(ctx: Context) = prefs(ctx).getFloat("qibla_calib", 0f)
+    fun setCalib(ctx: Context, v: Float) = prefs(ctx).edit().putFloat("qibla_calib", v).apply()
+
+    fun chooseMapMode(activity: Activity, onChanged: () -> Unit = {}) {
+        Dialogs.sheet(activity, "🗺", "نمط خريطة القبلة", "اختر طريقة استخدام خريطة الأقمار الصناعية") { col, dialog ->
+            val ui = Ui(activity)
+            MAP_MODES.forEachIndexed { i, (name, desc) ->
+                val sel = mapMode(activity) == i
+                col.addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
+                    background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
+                    addView(ui.text((if (sel) "◉  " else "○  ") + name, 16f, Colors.TEXT, bold = true))
+                    addView(ui.text(desc, 13f, Colors.MUTED).apply { setPadding(0, ui.dp(4), 0, 0) })
+                    setOnClickListener { setMapMode(activity, i); dialog.dismiss(); onChanged() }
+                }, ui.match(0, 4, 0, 4))
+            }
+            if (calib(activity) != 0f) col.addView(ui.outlineButton("مسح تصحيح البوصلة (${calib(activity).roundToInt()}°)") {
+                setCalib(activity, 0f); dialog.dismiss(); Toast.makeText(activity, "تم مسح التصحيح", Toast.LENGTH_SHORT).show()
+            }, ui.match(0, 8, 0, 0))
+        }
+    }
 
     private var permissionCallback: (() -> Unit)? = null
     fun onPermissionResult() { permissionCallback?.invoke(); permissionCallback = null }
@@ -210,7 +243,20 @@ object Qibla {
             background = ui.rounded(bg, 18)
             setOnClickListener { if (js != null) web.evaluateJavascript(js, null); action?.invoke() }
         }, ui.wrap(0, 0, 6, 0))
-        chip("◎ موقعي", Color.parseColor("#4FC3D4"), Color.BLACK, "goMe()")
+        val mode = mapMode(activity)
+        var tracking = mode >= 1
+        if (mode >= 1) {
+            lateinit var trackChip: android.widget.TextView
+            chip("🧭 تتبّع الاتجاه", Color.parseColor("#4FC3D4"), Color.BLACK, null) {
+                tracking = !tracking
+                web.evaluateJavascript("setTracking($tracking)", null)
+                trackChip.background = ui.rounded(if (tracking) Color.parseColor("#4FC3D4") else Color.parseColor("#2A2A2A"), 18)
+                trackChip.setTextColor(if (tracking) Color.BLACK else Color.WHITE)
+            }
+            trackChip = btns.getChildAt(btns.childCount - 1) as android.widget.TextView
+        }
+        if (mode == 2) chip("📐 صحّح بالمبنى", Color.parseColor("#E9C46A"), Color.parseColor("#2A1A00"), "startCalib()")
+        chip("◎ موقعي", Color.parseColor(if (mode >= 1) "#2A2A2A" else "#4FC3D4"), if (mode >= 1) Color.WHITE else Color.BLACK, "goMe()")
         chip("🕋 الكعبة", Color.parseColor("#2A2A2A"), Color.WHITE, "goKaaba()")
         chip("↔ الكل", Color.parseColor("#2A2A2A"), Color.WHITE, "overview()")
         chip("خرائط قوقل ↗", Color.parseColor("#2A2A2A"), Color.WHITE, null) {
@@ -263,6 +309,22 @@ object Qibla {
         val sm = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: sm.getDefaultSensor(Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR)
         var aligned = false
+        var mapAligned = false
+        var rawHeading = Float.NaN
+        val vibrator = activity.getSystemService(android.os.Vibrator::class.java)
+        // Building correction saved by «📐 صحّح بالمبنى»: the map's turn shows the real heading of the phone's top.
+        web.addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface fun calibrated(mapBearing: Float) {
+                activity.runOnUiThread {
+                    if (rawHeading.isNaN()) return@runOnUiThread
+                    var c = ((-mapBearing) - rawHeading) % 360f
+                    if (c > 180) c -= 360f
+                    if (c < -180) c += 360f
+                    setCalib(activity, c)
+                    Toast.makeText(activity, "تم تصحيح البوصلة ${c.roundToInt()}°", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }, "Q")
         val sensorListener = object : SensorEventListener {
             private val rot = FloatArray(9)
             private val ori = FloatArray(3)
@@ -271,7 +333,14 @@ object Qibla {
                 SensorManager.getOrientation(rot, ori)
                 // Heading of the top of the screen: add the display rotation when the phone is held sideways.
                 @Suppress("DEPRECATION") val turn = activity.windowManager.defaultDisplay.rotation * 90
-                val az = ((Math.toDegrees(ori[0].toDouble()) + turn + 360) % 360).toFloat()
+                val raw = ((Math.toDegrees(ori[0].toDouble()) + turn + 360) % 360).toFloat()
+                rawHeading = if (rawHeading.isNaN()) raw else {
+                    var d = raw - rawHeading
+                    if (d > 180) d -= 360f
+                    if (d < -180) d += 360f
+                    (rawHeading + d * 0.2f + 360f) % 360f
+                }
+                val az = ((raw + calib(activity)) % 360f + 360f) % 360f
                 heading = if (heading.isNaN()) az else {
                     var d = az - heading
                     if (d > 180) d -= 360f
@@ -295,6 +364,13 @@ object Qibla {
                 }
                 hint.setTextColor(if (ok) Color.parseColor("#2E9E4F") else Color.parseColor("#E65100"))
                 web.evaluateJavascript("heading(${heading})", null)
+                if (tracking) {
+                    web.evaluateJavascript("track($heading,$diff,$ok)", null)
+                    if (ok && !mapAligned && body.getChildAt(0) === mapBox) runCatching {
+                        vibrator?.vibrate(android.os.VibrationEffect.createOneShot(90, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                    }
+                    mapAligned = ok
+                }
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
         }
@@ -332,7 +408,10 @@ object Qibla {
             }
         }
         web.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String?) { pageReady = true; pushToMap() }
+            override fun onPageFinished(view: WebView, url: String?) {
+                pageReady = true; pushToMap()
+                if (tracking) view.evaluateJavascript("setTracking(true)", null)
+            }
         }
         if (hasLocation(activity)) startLocation()
         else {

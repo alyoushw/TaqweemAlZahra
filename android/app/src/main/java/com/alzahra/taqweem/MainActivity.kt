@@ -113,6 +113,7 @@ class MainActivity : Activity() {
         super.onResume()
         Updater.check(this, manual = false) { showUpdateBanner(it) }
         Recitations.refresh(this)
+        LocationTimes.followQuietly(this)
         if (tab == 1) selectTab(1)
     }
 
@@ -129,6 +130,7 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 21) Qibla.onPermissionResult()
+        if (requestCode == LocationTimes.PERMISSION_CODE) LocationTimes.onPermissionResult(grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED })
     }
 
     private fun askNotificationPermission() {
@@ -304,6 +306,47 @@ class MainActivity : Activity() {
                 }
             })
             col.addView(fr, ui.match(0, 4, 0, 4))
+            // Prayer times for the user's own location (the dates and occasions stay from the Zahra calendar).
+            val lr = ui.row().apply {
+                setPadding(ui.dp(14), ui.dp(10), ui.dp(10), ui.dp(10))
+                background = ui.rounded(Colors.CARD, 16, Colors.STROKE, 1)
+            }
+            lr.addView(ui.text("📍", 22f, ui.ink).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(ui.dp(40), ui.dp(40)))
+            val lt = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(ui.dp(10), 0, 0, 0) }
+            lt.addView(ui.text("أوقات الصلاة حسب موقعي", 15.5f, Colors.TEXT, bold = true))
+            val locSub = ui.text("", 12.5f, Colors.MUTED)
+            fun paintLoc() {
+                locSub.text = if (LocationTimes.on(this@MainActivity)) "محسوبة لموقعك: ${LocationTimes.placeLabel(this@MainActivity)}\nالتواريخ والمناسبات من تقويم الزهراء"
+                    else "متوقف — الأوقات من تقويم الزهراء للأحساء"
+            }
+            paintLoc()
+            lt.addView(locSub)
+            lr.addView(lt, ui.weight())
+            val lsw = android.widget.Switch(this)
+            lr.setOnClickListener { lsw.toggle() }
+            fun applied() {
+                AlarmScheduler.scheduleNext(this@MainActivity)
+                ZahraWidget.updateAll(this@MainActivity)
+                paintLoc()
+                dialog.setOnDismissListener { selectTab(tab) }
+            }
+            lr.addView(lsw.apply {
+                isChecked = LocationTimes.on(this@MainActivity)
+                setOnCheckedChangeListener { sw, on ->
+                    if (!on) { LocationTimes.setOn(this@MainActivity, false); applied(); return@setOnCheckedChangeListener }
+                    locSub.text = "⏳ جاري تحديد موقعك…"
+                    LocationTimes.locate(this@MainActivity) { ok ->
+                        if (ok) {
+                            LocationTimes.setOn(this@MainActivity, true); applied()
+                            Toast.makeText(this@MainActivity, "صارت الأوقات حسب موقعك: ${LocationTimes.placeLabel(this@MainActivity)}", Toast.LENGTH_LONG).show()
+                        } else {
+                            sw.isChecked = false; paintLoc()
+                            Toast.makeText(this@MainActivity, "تعذر تحديد الموقع — فعّل الموقع (GPS) وحاول مرة ثانية", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            })
+            col.addView(lr, ui.match(0, 4, 0, 4))
             row("🔔", "الإشعارات والأذان", "تنبيهات الصلاة ومناسبة اليوم") { Dialogs.notifications(this) }
             row("🧭", "اتجاه القبلة", "البوصلة وخريطة الأقمار الصناعية") { Qibla.show(this) }
             row("🗺", "نمط خريطة القبلة", Qibla.MAP_MODES[Qibla.mapMode(this)].first) { Qibla.chooseMapMode(this) { dialog.dismiss(); settings() } }

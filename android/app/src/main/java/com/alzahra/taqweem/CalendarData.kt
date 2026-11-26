@@ -78,6 +78,7 @@ object CalendarData {
             val json = ctx.applicationContext.assets.open("calendar.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
             val arr = JSONObject(json).getJSONArray("days")
             val delay = fajrDelayOn(ctx)
+            val byLocation = LocationTimes.on(ctx) // times for the user's own place instead of the printed Ahsa ones
             val list = ArrayList<Day>(arr.length())
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
@@ -93,10 +94,10 @@ object CalendarData {
                     gregColor = o.getString("gC"), zahraColor = o.getString("zC"),
                     mark = o.getString("mark"), sakan = o.getString("sakan"), hijama = o.getString("hij"),
                     tale = o.getString("tale"),
-                    times = DayTimes(
-                        t.getString("imsak"), t.getString("fajr").let { if (delay) addMinutes(it, FAJR_DELAY_MIN) else it }, t.getString("sunrise"), t.getString("dhuhr"),
+                    times = (if (byLocation) LocationTimes.times(ctx, LocalDate.parse(o.getString("g"))) else DayTimes(
+                        t.getString("imsak"), t.getString("fajr"), t.getString("sunrise"), t.getString("dhuhr"),
                         t.getString("maghrib"), t.getString("midnight"), t.getString("qibla"), t.getString("sahur"),
-                    ),
+                    )).let { if (delay) it.copy(fajr = addMinutes(it.fajr, FAJR_DELAY_MIN)) else it },
                     occasions = occ,
                 )
             }
@@ -104,6 +105,9 @@ object CalendarData {
             return list
         }
     }
+
+    /** Re-read the times next time (fajr delay or location times changed). */
+    fun invalidate() { cache = null }
 
     fun byDate(ctx: Context, date: LocalDate): Day? = days(ctx).firstOrNull { it.greg == date }
     fun month(ctx: Context, m: Int): List<Day> = days(ctx).filter { it.month == m }

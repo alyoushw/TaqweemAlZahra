@@ -232,6 +232,17 @@ object Dialogs {
                 Toast.makeText(activity, "تم إرسال إشعار تجريبي — انظر شريط الإشعارات", Toast.LENGTH_SHORT).show()
             }
         })
+        // Operational calendar reminders (before holidays and school dates).
+        col.addView(ui.text("📅 تذكير الإجازات وبداية الدراسة (التقويم التشغيلي)", 16f, ui.ink, bold = true), ui.match(0, 14, 0, 4))
+        OpsCalendar.LEADS.forEach { (days, name) ->
+            col.addView(ui.toggle(name, OpsCalendar.leadOn(activity, days)) { on -> OpsCalendar.setLead(activity, days, on); AlarmScheduler.scheduleNext(activity) })
+        }
+        col.addView(ui.toggle("إظهار الإجازات في جدول التقويم", OpsCalendar.inTable(activity)) { on -> OpsCalendar.setInTable(activity, on) })
+        OpsCalendar.upcoming(activity, java.time.LocalDate.now(), 1).firstOrNull()?.let { m ->
+            col.addView(ui.text("القادم: ${OpsCalendar.icon(m)} ${m.title} — ${OpsCalendar.dateText(m.date)}", 13.5f, Colors.TEXT).apply {
+                setPadding(ui.dp(14), ui.dp(10), ui.dp(14), ui.dp(10)); background = ui.rounded(Colors.SOFT, 14)
+            }, ui.match(0, 6, 0, 4))
+        }
         col.addView(ui.text("🔊 صوت الأذان (الصبح والظهر والمغرب)", 16f, ui.ink, bold = true), ui.match(0, 14, 0, 4))
         val rows = ArrayList<Pair<String, android.widget.TextView>>()
         fun paint() = rows.forEach { (id, v) ->

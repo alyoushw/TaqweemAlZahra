@@ -382,6 +382,7 @@ class MainActivity : Activity() {
             col.addView(lr, ui.match(0, 4, 0, 4))
             row("🔔", "الإشعارات والأذان", "تنبيهات الصلاة ومناسبة اليوم") { Dialogs.notifications(this) }
             row("🧭", "اتجاه القبلة", "البوصلة وخريطة الأقمار الصناعية") { Qibla.show(this) }
+            row("📅", "التقويم التشغيلي والمدرسي", "الإجازات وبداية الدراسة ٢٠٢٦ و٢٠٢٧") { OpsCalendar.showPage(this) }
             row("🗺", "نمط خريطة القبلة", Qibla.MAP_MODES[Qibla.mapMode(this)].first) { Qibla.chooseMapMode(this) { dialog.dismiss(); settings() } }
             row("⚠", "تنبيه السيستاني", "الاحتياط في الإمساك وصلاة الصبح") { Dialogs.sistani(this) }
             row("📄", "صفحة التنبيهات والإرشادات", "شرح رموز وألوان التقويم") { Dialogs.page(this, 13) }
@@ -497,6 +498,9 @@ class MainActivity : Activity() {
             }
             col.addView(card)
         }
+
+        // Operational calendar: the next holiday and what's coming.
+        OpsCalendar.upcomingCard(this)?.let { col.addView(it, ui.match(0, 12, 0, 0)) }
 
         // Duas and ziyarat: two big buttons, each opens a list; a text opens on its own page.
         val pr = ui.row().apply { setPadding(0, ui.dp(14), 0, 0) }

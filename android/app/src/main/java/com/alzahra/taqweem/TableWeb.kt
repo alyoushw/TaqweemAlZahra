@@ -34,6 +34,7 @@ object TableWeb {
         val cToday = if (d) "#E0B84A" else hex(t.primary)
         val days = CalendarData.month(activity, month)
         val today = LocalDate.now()
+        val showOps = OpsCalendar.inTable(activity)
         val hasSakan = days.any { it.sakan.isNotBlank() }
         val hasSahur = days.any { it.times.sahur.isNotBlank() }
         val years = days.map { it.greg.year }.distinct().joinToString("<br>")
@@ -69,7 +70,11 @@ object TableWeb {
                 if (hasSakan) append("<td class='${if (d.sakan.startsWith("ردي")) "red" else "grn"}'>${esc(d.sakan)}</td>")
                 append("<td class='tale${if (d.tale.length > 3) " small" else ""}'>${esc(d.tale)}</td>")
                 val ev = d.occasions.joinToString(" / ") { o -> "<span class='c${o.color}'>${esc(o.text)}</span>" }
-                append("<td class='ev'>$ev</td>")
+                // Operational calendar tag (holidays, school dates), small, under the occasions.
+                val ops = if (showOps) OpsCalendar.marksOn(activity, d.greg).firstOrNull()?.let { m ->
+                    "<span class='ops' style='background:${hex(OpsCalendar.color(m.kind))}'>${OpsCalendar.icon(m)} ${esc(m.title)}</span>"
+                } ?: "" else ""
+                append("<td class='ev'>$ev$ops</td>")
                 if (hasSahur) append("<td>${ar(d.times.sahur)}</td>")
                 append("<td class='pink'>${ar(d.times.imsak)}</td><td>${ar(d.times.fajr)}</td><td class='blue'>${ar(d.times.sunrise)}</td>")
                 append("<td>${ar(d.times.dhuhr)}</td><td class='pink'>${ar(d.times.maghrib)}</td><td>${ar(d.times.midnight)}</td>")
@@ -92,6 +97,7 @@ td{font-size:16px;font-weight:bold;text-align:center;padding:0 6px;height:52px;b
 tr.alt td{background:$cAlt}
 @keyframes fl{0%,100%{filter:none}25%,75%{filter:brightness(1.35)}50%{filter:brightness(0.8)}}
 tr.today.flash td{animation:fl 1.2s ease 2}
+.ops{display:block;width:max-content;margin-top:3px;color:#fff;font-size:11px;font-weight:bold;padding:1px 7px;border-radius:7px}
 tr.today td{background:${hex(t.todayRow)};border-top:2px solid $cToday;border-bottom:2px solid $cToday}
 td.ev{text-align:right;min-width:430px;white-space:normal;line-height:1.35;font-size:15.5px;padding:4px 10px}
 th.ev{min-width:430px}

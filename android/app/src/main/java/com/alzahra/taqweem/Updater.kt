@@ -28,6 +28,9 @@ object Updater {
     private const val BRANCH = "claude/zahra-calendar-errors-91f4b1"
     private const val API_JSON = "https://api.github.com/repos/$REPO/contents/release/latest.json?ref=$BRANCH"
     private const val RAW_JSON = "https://raw.githubusercontent.com/$REPO/$BRANCH/release/latest.json"
+    // A quiet channel: offered only when the user presses «التحديثات» in the settings, never on its own.
+    private const val API_MANUAL = "https://api.github.com/repos/$REPO/contents/release/latest-manual.json?ref=$BRANCH"
+    private const val RAW_MANUAL = "https://raw.githubusercontent.com/$REPO/$BRANCH/release/latest-manual.json"
     const val APK_URL = "https://github.com/$REPO/raw/$BRANCH/release/taqweem-alzahra.apk"
 
     data class Release(val code: Int, val name: String, val apk: String, val notes: String)
@@ -49,7 +52,9 @@ object Updater {
         }
         lastCheck = now
         Thread {
-            val rel = runCatching { fetch(API_JSON, github = true) }.recoverCatching { fetch(RAW_JSON, github = false) }.getOrNull()
+            val public = runCatching { fetch(API_JSON, github = true) }.recoverCatching { fetch(RAW_JSON, github = false) }.getOrNull()
+            val quiet = if (!manual) null else runCatching { fetch(API_MANUAL, github = true) }.recoverCatching { fetch(RAW_MANUAL, github = false) }.getOrNull()
+            val rel = listOfNotNull(public, quiet).maxByOrNull { it.code }
             Handler(Looper.getMainLooper()).post {
                 if (activity.isFinishing || activity.isDestroyed) return@post
                 when {

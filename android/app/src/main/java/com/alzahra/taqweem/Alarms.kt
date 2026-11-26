@@ -125,6 +125,8 @@ object AlarmScheduler {
     private const val KIND_OCCASION = "occasion"
     private const val KIND_REFRESH = "refresh"
     private const val KIND_EVE = "eve"
+    private const val KIND_OPS = "ops"
+    private val OPS_TIME: LocalTime = LocalTime.of(9, 10)
     private val OCCASION_TIME: LocalTime = LocalTime.of(9, 0)
     private val EVE_TIME: LocalTime = LocalTime.of(19, 0)
     /** «الليلة» reminder: 9 in the morning of the day before, so the night's occasion is known in good time. */
@@ -138,6 +140,9 @@ object AlarmScheduler {
         for (offset in 0L..1L) {
             val date = now.toLocalDate().plusDays(offset)
             candidates += Next(date.atTime(0, 0, 30), KIND_REFRESH)
+            // Operational calendar: reminders before holidays and school dates (all of a day's in one firing;
+            // they go on after the Zahra year ends).
+            if (OpsCalendar.remindersOn(ctx, date).isNotEmpty()) candidates += Next(date.atTime(OPS_TIME), KIND_OPS)
             val day = CalendarData.byDate(ctx, date) ?: continue
             for (p in Prayer.entries) {
                 val t = CalendarData.timeOf(day, p) ?: continue
@@ -190,6 +195,7 @@ object AlarmScheduler {
                 if (p != null) Notifier.showPrayer(ctx, p, intent.getStringExtra(EXTRA_TIME) ?: "")
             }
             KIND_OCCASION -> CalendarData.byDate(ctx, LocalDateTime.now().toLocalDate())?.let { Notifier.showOccasion(ctx, it) }
+            KIND_OPS -> OpsCalendar.showReminders(ctx)
             KIND_EVE -> CalendarData.byDate(ctx, LocalDateTime.now().toLocalDate().plusDays(1))?.let { Notifier.showOccasion(ctx, it, eve = true) }
         }
     }

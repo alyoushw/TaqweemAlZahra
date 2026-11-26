@@ -472,6 +472,12 @@ object Dialogs {
                 }
                 head.addView(ui.text(sb, 16.5f, Colors.TEXT, bold = true).apply { setPadding(0, ui.dp(12), 0, 0); setLineSpacing(0f, 1.3f) })
             }
+            // Operational calendar on this day (holiday / school), and a button to see it on the full page.
+            OpsCalendar.marksOn(activity, d.greg).forEach { m ->
+                head.addView(ui.text("${OpsCalendar.icon(m)}  ${m.title}", 13.5f, Color.WHITE, bold = true).apply {
+                    setPadding(ui.dp(10), ui.dp(5), ui.dp(10), ui.dp(5)); background = ui.rounded(OpsCalendar.color(m.kind), 12)
+                }, ui.wrap(0, 10, 0, 0))
+            }
             col.addView(head)
             val pictured = mutableListOf<View>(head) // what goes into the shared picture
 
@@ -510,6 +516,8 @@ object Dialogs {
                 col.addView(row)
                 pictured += row
             }
+
+            col.addView(ui.outlineButton("📅 تقويم أرامكو — هذا اليوم") { OpsCalendar.showPage(activity, d.greg) }, ui.match(3, 10, 3, 0))
 
             // Share
             val text = shareText(d)

@@ -499,9 +499,6 @@ class MainActivity : Activity() {
             col.addView(card)
         }
 
-        // Operational calendar: the next holiday and what's coming.
-        OpsCalendar.upcomingCard(this)?.let { col.addView(it, ui.match(0, 12, 0, 0)) }
-
         // Duas and ziyarat: two big buttons, each opens a list; a text opens on its own page.
         val pr = ui.row().apply { setPadding(0, ui.dp(14), 0, 0) }
         fun bigButton(icon: String, label: String, sub: String, onClick: () -> Unit) = LinearLayout(this).apply {
@@ -517,6 +514,9 @@ class MainActivity : Activity() {
         pr.addView(bigButton("🤲", "الأدعية", "${CalendarData.ar(Prayers.duas(this).size)} دعاء كامل") { prayerList("dua") }, ui.weight().apply { setMargins(0, 0, ui.dp(6), 0) })
         pr.addView(bigButton("🕌", "الزيارات", "${CalendarData.ar(Prayers.ziyarat(this).size)} زيارات كاملة") { prayerList("ziyarat") }, ui.weight().apply { setMargins(ui.dp(6), 0, 0, 0) })
         col.addView(pr)
+
+        // Operational calendar: the next holiday and what's coming (under the duas and ziyarat).
+        OpsCalendar.upcomingCard(this)?.let { col.addView(it, ui.match(0, 14, 0, 0)) }
 
         // Month occasions log
         val logTitle = ui.text("", 17f, ui.ink, bold = true)

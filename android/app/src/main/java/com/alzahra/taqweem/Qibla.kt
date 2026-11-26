@@ -80,9 +80,42 @@ object Qibla {
     val MAP_MODES = listOf(
         "يدوي" to "تلف الخريطة وتحركها بإصبعيك بنفسك",
         "تتبّع الاتجاه" to "الخريطة تلف مع الجوال، وسهم يقول لك لف يمين أو يسار، والجوال يهتز لما تكون على القبلة",
-        "تتبّع + تصحيح بالمبنى" to "مثل التتبّع، ومعه زر «📐 صحّح بالمبنى»: تطابق جدار بيتك مرة وحدة فيصحّح التطبيق انحراف البوصلة",
     )
-    fun mapMode(ctx: Context) = prefs(ctx).getInt("qibla_map_mode", 0)
+    fun mapMode(ctx: Context) = prefs(ctx).getInt("qibla_map_mode", 0).coerceAtMost(MAP_MODES.size - 1)
+
+    /** Tools on the satellite map that don't rely on the compass; the user tries them and keeps the best. */
+    val MAP_TOOLS = listOf(
+        Triple("ruler", "📐 مسطرة الجدار", "اضغط طرفين جدار أو شارع في الخريطة، وبعدها ألصق جنب الجوال على نفس الجدار والسهم يأشر للقبلة"),
+        Triple("walk", "🚶 امشِ واعرف اتجاهك", "امشِ مستقيم ١٥–٢٠ خطوة والـ GPS يعرف اتجاه وجهك، والخريطة تلف عليه وسهم يأشر للقبلة"),
+        Triple("here", "📍 أنا هنا", "اضغط مطوّلاً على مكانك بالضبط في الخريطة (الـ GPS داخل المباني يغلط)، والخط يطلع من هناك"),
+        Triple("sun", "☀️ الشمس والقمر", "يرسم مكان الشمس (أو القمر بالليل) الحين؛ توجّه رأس الجوال لها ويقول لك كم القبلة عنها"),
+        Triple("align", "🔄 طابق الخريطة بالواقع", "لف الخريطة لين الشارع والمباني تطابق اللي قدامك، وسهم أخضر ثابت على الشاشة يأشر للقبلة"),
+        Triple("mosques", "🕌 المساجد القريبة", "يعرض المساجد حولك (يحتاج إنترنت)؛ جدار المحراب يقابل القبلة فتقارن مبناك معها"),
+        Triple("grid", "▦ خطوط القبلة المتوازية", "خطوط قبلة متوازية كل ٥ أمتار فوق المبنى كله، تقارنها بجدران أي غرفة"),
+        Triple("shadow", "🖊 ظل القلم", "بالنهار: اوقف قلم في الشمس ووجّه رأس الجوال لظله، ويقول لك كم القبلة عن الظل"),
+        Triple("polaris", "⭐ نجم القطب", "بالليل: وجّه رأس الجوال لنجم القطب (الشمال الحقيقي) ويقول لك كم القبلة عنه"),
+        Triple("walkcal", "🚶🧭 صحّح البوصلة بالمشي", "امشِ مستقيم والجوال قدامك؛ يقارن اتجاه مشيك من الـ GPS مع البوصلة ويصحّحها لهالمكان"),
+    )
+    fun tool(ctx: Context) = prefs(ctx).getString("qibla_tool", "ruler") ?: "ruler"
+    fun setTool(ctx: Context, id: String) = prefs(ctx).edit().putString("qibla_tool", id).apply()
+    fun toolName(ctx: Context) = (MAP_TOOLS.firstOrNull { it.first == tool(ctx) } ?: MAP_TOOLS[0]).second
+
+    fun chooseTool(activity: Activity, onPicked: (String) -> Unit = {}) {
+        Dialogs.sheet(activity, "🛠", "أداة خريطة القبلة", "أدوات بدون بوصلة — جرّبها واختر الأنسب لك") { col, dialog ->
+            val ui = Ui(activity)
+            MAP_TOOLS.forEach { (id, name, desc) ->
+                val sel = tool(activity) == id
+                col.addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(ui.dp(14), ui.dp(10), ui.dp(14), ui.dp(10))
+                    background = ui.rounded(if (sel) Colors.SELECTED else Colors.CARD, 14, if (sel) ui.fill else Colors.STROKE, if (sel) 2 else 1)
+                    addView(ui.text((if (sel) "◉  " else "○  ") + name, 15.5f, Colors.TEXT, bold = true))
+                    addView(ui.text(desc, 12.5f, Colors.MUTED).apply { setPadding(0, ui.dp(3), 0, 0) })
+                    setOnClickListener { setTool(activity, id); dialog.dismiss(); onPicked(id) }
+                }, ui.match(0, 3, 0, 3))
+            }
+        }
+    }
     fun setMapMode(ctx: Context, m: Int) = prefs(ctx).edit().putInt("qibla_map_mode", m).apply()
     /** Degrees added to the phone's compass, measured against the satellite picture of the user's building. */
     fun calib(ctx: Context) = prefs(ctx).getFloat("qibla_calib", 0f)
@@ -271,7 +304,14 @@ object Qibla {
             }
             trackChip = btns.getChildAt(btns.childCount - 1) as android.widget.TextView
         }
-        if (mode == 2) chip("📐 صحّح بالمبنى", Color.parseColor("#E9C46A"), Color.parseColor("#2A1A00"), "startCalib()")
+        // The chosen compass-free tool, and a button to switch tools.
+        lateinit var toolChip: android.widget.TextView
+        chip(toolName(activity), Color.parseColor("#E9C46A"), Color.parseColor("#2A1A00"), null) { web.evaluateJavascript("QT.start('${tool(activity)}')", null) }
+        toolChip = btns.getChildAt(btns.childCount - 1) as android.widget.TextView
+        chip("🔀 أداة ثانية", Color.parseColor("#2A2A2A"), Color.WHITE, null) {
+            chooseTool(activity) { id -> toolChip.text = toolName(activity); web.evaluateJavascript("QT.start('$id')", null) }
+        }
+        chip("✕ إخفاء الأداة", Color.parseColor("#2A2A2A"), Color.WHITE, "QT.stop()")
         chip("◎ موقعي", Color.parseColor(if (mode >= 1) "#2A2A2A" else "#4FC3D4"), if (mode >= 1) Color.WHITE else Color.BLACK, "goMe()")
         chip("🕋 الكعبة", Color.parseColor("#2A2A2A"), Color.WHITE, "goKaaba()")
         chip("↔ الكل", Color.parseColor("#2A2A2A"), Color.WHITE, "overview()")
@@ -340,9 +380,13 @@ object Qibla {
         updateDeclination()
         var mapAligned = false
         var rawHeading = Float.NaN
+        var walkCal: MutableList<Float>? = null // tool «صحّح البوصلة بالمشي»: GPS course minus compass, while walking
         val vibrator = activity.getSystemService(android.os.Vibrator::class.java)
         // Building correction saved by «📐 صحّح بالمبنى»: the map's turn shows the real heading of the phone's top.
         web.addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface fun walkCalib(on: Boolean) {
+                activity.runOnUiThread { walkCal = if (on) ArrayList() else null; if (on) web.evaluateJavascript("QT.walkcal.progress(0)", null) }
+            }
             @android.webkit.JavascriptInterface fun calibrated(mapBearing: Float) {
                 activity.runOnUiThread {
                     if (rawHeading.isNaN()) return@runOnUiThread
@@ -443,6 +487,22 @@ object Qibla {
         }
         val locListener = object : LocationListener {
             override fun onLocationChanged(l: Location) {
+                // Walking straight: the GPS course is the true direction of travel; the compass error is the difference.
+                walkCal?.let { list ->
+                    if (l.hasBearing() && l.hasSpeed() && l.speed > 0.6f && !rawHeading.isNaN()) {
+                        var dlt = (l.bearing - rawHeading - declination) % 360f
+                        if (dlt > 180) dlt -= 360f
+                        if (dlt < -180) dlt += 360f
+                        list += dlt
+                        web.evaluateJavascript("QT.walkcal.progress(${list.size})", null)
+                        if (list.size >= 8) {
+                            val c = list.sorted()[list.size / 2]
+                            setCalibAt(activity, c, l.latitude, l.longitude)
+                            walkCal = null
+                            web.evaluateJavascript("QT.walkcal.done($c)", null)
+                        }
+                    }
+                }
                 lat = l.latitude; lon = l.longitude; fromGps = true
                 lastFix = l
                 qibla = bearing(lat, lon)

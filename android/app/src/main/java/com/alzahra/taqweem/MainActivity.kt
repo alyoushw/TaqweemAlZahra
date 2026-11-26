@@ -383,6 +383,7 @@ class MainActivity : Activity() {
             row("🔔", "الإشعارات والأذان", "تنبيهات الصلاة ومناسبة اليوم") { Dialogs.notifications(this) }
             row("🧭", "اتجاه القبلة", "البوصلة وخريطة الأقمار الصناعية") { Qibla.show(this) }
             row("📅", "التقويم التشغيلي والمدرسي", "الإجازات وبداية الدراسة ٢٠٢٦ و٢٠٢٧") { OpsCalendar.showPage(this) }
+            row("🛠", "أداة خريطة القبلة (للتجربة)", Qibla.toolName(this)) { Qibla.chooseTool(this) { dialog.dismiss(); settings() } }
             row("🗺", "نمط خريطة القبلة", Qibla.MAP_MODES[Qibla.mapMode(this)].first) { Qibla.chooseMapMode(this) { dialog.dismiss(); settings() } }
             row("⚠", "تنبيه السيستاني", "الاحتياط في الإمساك وصلاة الصبح") { Dialogs.sistani(this) }
             row("📄", "صفحة التنبيهات والإرشادات", "شرح رموز وألوان التقويم") { Dialogs.page(this, 13) }

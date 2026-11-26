@@ -38,7 +38,7 @@ var map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:20,zoomSn
 addEventListener('resize',function(){sizeMap();map.invalidateSize({pan:false});});
 var vscale=1; // visual zoom while two fingers are down; applied to the map for real when they lift
 function applyBearing(){document.getElementById('map').style.transform='rotate('+bearing+'deg) scale('+vscale+')';
- document.querySelector('#north svg').style.transform='rotate('+bearing+'deg)';}
+ document.querySelector('#north svg').style.transform='rotate('+bearing+'deg)';if(window.QT)QT.turned();}
 function northUp(){if(tracking&&!calibrating)return;bearing=0;applyBearing();}
 var tracking=false,calibrating=false;
 function show(id,on){document.getElementById(id).style.display=on?'block':'none';}
@@ -52,7 +52,7 @@ function track(h,diff,ok){if(!tracking||calibrating)return;bearing=-h;applyBeari
 function startCalib(){calibrating=true;show('trk',false);show('cal',true);show('wall',true);show('wallLab',true);show('phoneTop',true);goMe();}
 function endCalib(ok){calibrating=false;show('cal',false);show('wall',false);show('wallLab',false);show('phoneTop',tracking);
  if(ok&&window.Q)Q.calibrated(bearing);}
-(function(){var t0=null,g=null; // g: the two-finger gesture in progress
+(function(){var t0=null,g=null,tp=null; // g: the two-finger gesture in progress; tp: a possible tap / long press
  function commit(){ // fingers lifted: turn the visual zoom into a real zoom (tiles load once, not on every move)
   if(!g)return;var z=Math.max(3,Math.min(20,g.z+Math.log2(vscale)));g=null;vscale=1;applyBearing();map.setZoom(z,{animate:false});}
  function pts(e){return Array.prototype.map.call(e.touches,function(t){return{x:t.clientX,y:t.clientY};});}
@@ -60,8 +60,10 @@ function endCalib(ok){calibrating=false;show('cal',false);show('wall',false);sho
   var a=-bearing*Math.PI/180,mx=dx*Math.cos(a)-dy*Math.sin(a),my=dx*Math.sin(a)+dy*Math.cos(a);
   map.panBy([-mx,-my],{animate:false});}
  var w=document.getElementById('wrap');
- w.addEventListener('touchstart',function(e){t0={p:pts(e),z:map.getZoom(),b:bearing};},{passive:false});
- w.addEventListener('touchmove',function(e){e.preventDefault();var p=pts(e);if(!t0)return;
+ w.addEventListener('touchstart',function(e){t0={p:pts(e),z:map.getZoom(),b:bearing};
+  tp=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now()}:null;},{passive:false});
+ w.addEventListener('touchmove',function(e){e.preventDefault();var p=pts(e);
+  if(tp&&(p.length>1||Math.hypot(p[0].x-tp.x,p[0].y-tp.y)>12))tp=null;if(!t0)return;
   if(p.length===1&&t0.p.length===1){pan(p[0].x-t0.p[0].x,p[0].y-t0.p[0].y);t0.p=p;}
   else if(p.length>=2&&t0.p.length>=2){
    var a0=Math.atan2(t0.p[1].y-t0.p[0].y,t0.p[1].x-t0.p[0].x),a1=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);
@@ -74,7 +76,9 @@ function endCalib(ok){calibrating=false;show('cal',false);show('wall',false);sho
    pan((c1.x-c0.x)/vscale,(c1.y-c0.y)/vscale);
    t0={p:p,z:map.getZoom(),b:bearing};}
   else{commit();t0={p:p,z:map.getZoom(),b:bearing};}},{passive:false});
- w.addEventListener('touchend',function(e){if(e.touches.length<2)commit();t0=e.touches.length?{p:pts(e),z:map.getZoom(),b:bearing}:null;});
+ w.addEventListener('touchend',function(e){
+  if(tp&&e.touches.length===0&&window.QT){if(Date.now()-tp.t>550)QT.hold(tp.x,tp.y);else QT.tap(tp.x,tp.y);}if(e.touches.length===0)tp=null;
+  if(e.touches.length<2)commit();t0=e.touches.length?{p:pts(e),z:map.getZoom(),b:bearing}:null;});
 })();
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,keepBuffer:6,attribution:'Esri, Maxar'}).addTo(map);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,keepBuffer:6,opacity:.9}).addTo(map);
@@ -89,7 +93,9 @@ function gc(a,b,n){var la1=rad(a[0]),lo1=rad(a[1]),la2=rad(b[0]),lo2=rad(b[1]);
   p.push([deg(Math.atan2(z,Math.sqrt(x*x+y*y))),deg(Math.atan2(y,x))]);}return p;}
 // Dense near the user so the line is exact over their building.
 function path(a){var near=gc(a,KAABA,4000).slice(0,60);return near.concat(gc(a,KAABA,200));}
-function setMe(lat,lon,accuracy,first){pos=[lat,lon];
+function setMe(lat,lon,accuracy,first,picked){
+ if(!picked&&window.QT&&QT.gps(lat,lon,accuracy))return; // a place picked by hand («أنا هنا») stays until the user goes back to GPS
+ pos=[lat,lon];
  if(!me){me=L.marker(pos,{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[20,20],iconAnchor:[10,10]}),zIndexOffset:1000}).addTo(map);
   acc=L.circle(pos,{radius:accuracy,color:'#1E88E5',weight:1,fillOpacity:.12}).addTo(map);}
  else{me.setLatLng(pos);acc.setLatLng(pos).setRadius(accuracy);}
@@ -101,4 +107,5 @@ function heading(h){if(!pos)return;var r=0.00025,pts=[pos];for(var a=h-25;a<=h+2
 function goMe(){if(pos)map.setView(pos,19);}
 function goKaaba(){map.setView(KAABA,18);}
 function overview(){if(pos)map.fitBounds(L.latLngBounds([pos,KAABA]),{padding:[40,40]});}
-</script></body></html>
+</script>
+<script src="qibla_tools.js"></script></body></html>

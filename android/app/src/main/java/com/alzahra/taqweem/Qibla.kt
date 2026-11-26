@@ -166,7 +166,11 @@ object Qibla {
         root.addView(body, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
         // ---- state shared by both modes ----
-        var lat = AHSA_LAT; var lon = AHSA_LON; var fromGps = false
+        // Start from the place the user set (📍), not Ahsa; live GPS refines it when it arrives.
+        val saved = LocationTimes.hasPlace(activity)
+        var lat = if (saved) LocationTimes.lat(activity) else AHSA_LAT
+        var lon = if (saved) LocationTimes.lon(activity) else AHSA_LON
+        var fromGps = false
         var qibla = bearing(lat, lon)
         var heading = Float.NaN
 
@@ -298,10 +302,10 @@ object Qibla {
 
         fun refreshTexts() {
             val km = distanceKm(lat, lon)
-            val where = if (fromGps) "موقعك الحالي" else "الأحساء (افتراضي)"
+            val where = if (fromGps) "موقعك الحالي" else if (saved) "📍 ${LocationTimes.placeLabel(activity)}" else "الأحساء (افتراضي)"
             sub.text = "$where • ${"%,.0f".format(km)} كم إلى مكة"
             dist.text = "${"%,.1f".format(km)} كم"
-            info.text = "اتجاه القبلة ${qibla.roundToInt()}° من الشمال • " + if (fromGps) "حسب موقعك بالـ GPS" else "بانتظار تحديد موقعك…"
+            info.text = "اتجاه القبلة ${qibla.roundToInt()}° من الشمال • " + if (fromGps) "حسب موقعك بالـ GPS" else if (saved) "حسب موقعك المحدد" else "بانتظار تحديد موقعك…"
             compass.qibla = qibla.toFloat()
         }
         refreshTexts()

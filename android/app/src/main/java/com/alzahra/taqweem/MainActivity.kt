@@ -159,9 +159,14 @@ class MainActivity : Activity() {
         }
         val r1 = ui.row()
         val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        titles.addView(ui.text("تقويم الزهراء - الأحساء", 21f, t.accent, bold = true))
+        // One line; shrinks a little on narrow phones now that the header has four buttons.
+        titles.addView(ui.text("تقويم الزهراء - الأحساء", 21f, t.accent, bold = true).apply {
+            maxLines = 1
+            setAutoSizeTextTypeUniformWithConfiguration(13, 21, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(30)))
         val today = CalendarData.byDate(this, LocalDate.now())
-        val sub = if (today != null) "${CalendarData.weekday(today)} • ${today.zahra} ${CalendarData.MONTHS[today.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ" else "١٤٤٨هـ"
+        val place = if (LocationTimes.on(this)) "  •  📍 ${LocationTimes.placeLabel(this)}" else ""
+        val sub = (if (today != null) "${CalendarData.weekday(today)} • ${today.zahra} ${CalendarData.MONTHS[today.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ" else "١٤٤٨هـ") + place
         titles.addView(ui.text(sub, 14f, Color.parseColor("#E6FFFFFF")).apply {
             setPadding(0, ui.dp(2), 0, 0)
             setOnClickListener { goToday() }
@@ -172,6 +177,13 @@ class MainActivity : Activity() {
             background = ui.rounded(t.accent, 12)
             setOnClickListener { goToday() }
         }, ui.wrap(0, 0, 8, 0))
+        // 📍 Set my location: prayer times and the qibla follow where the phone is now.
+        r1.addView(ui.text("📍", 20f, Color.WHITE).apply {
+            gravity = Gravity.CENTER
+            background = ui.rounded(if (LocationTimes.on(this@MainActivity)) t.accent else Color.parseColor("#33FFFFFF"), 12)
+            contentDescription = "تحديد موقعي"
+            setOnClickListener { setMyLocation() }
+        }, LinearLayout.LayoutParams(ui.dp(42), ui.dp(42)).apply { marginEnd = ui.dp(8) })
         r1.addView(KaabaButton(this, t.accent).apply {
             background = ui.rounded(Color.parseColor("#33FFFFFF"), 12)
             contentDescription = "اتجاه القبلة"
@@ -222,6 +234,21 @@ class MainActivity : Activity() {
                 else -> pagesTab()
             },
         )
+    }
+
+    private fun setMyLocation() {
+        Toast.makeText(this, "⏳ جاري تحديد موقعك…", Toast.LENGTH_SHORT).show()
+        LocationTimes.locate(this) { ok ->
+            if (!ok) {
+                Toast.makeText(this, "تعذر تحديد الموقع — فعّل الموقع (GPS) وحاول مرة ثانية", Toast.LENGTH_LONG).show()
+                return@locate
+            }
+            LocationTimes.setOn(this, true)
+            AlarmScheduler.scheduleNext(this)
+            ZahraWidget.updateAll(this)
+            Toast.makeText(this, "📍 ${LocationTimes.placeLabel(this)} — الأوقات واتجاه القبلة صارت حسب موقعك", Toast.LENGTH_LONG).show()
+            recreate()
+        }
     }
 
     private fun goToday() {

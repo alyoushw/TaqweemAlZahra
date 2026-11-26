@@ -94,7 +94,7 @@ object Qibla {
         val c = calib(ctx)
         if (c == 0f) return 0f
         val p = prefs(ctx)
-        if (!p.contains("qibla_calib_lat")) return c
+        if (!p.contains("qibla_calib_lat")) return 0f // an old correction from before places were saved: not trusted
         val d = FloatArray(1)
         Location.distanceBetween(lat, lon, p.getFloat("qibla_calib_lat", 0f).toDouble(), p.getFloat("qibla_calib_lon", 0f).toDouble(), d)
         return if (d[0] < 1000f) c else 0f
@@ -323,7 +323,13 @@ object Qibla {
 
         // ---- sensors ----
         val sm = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: sm.getDefaultSensor(Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR)
+        // Phones with a gyroscope: the fused rotation sensor (steady and accurate). Without one (some budget phones
+        // emulate it badly): the magnetometer and accelerometer directly, as most qibla apps do.
+        val hasGyro = sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null
+        val sensor = if (hasGyro) sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) else null
+        val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val magnet = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+        var magAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH
         var aligned = false
         var declination = 0f
         fun updateDeclination() {
@@ -350,13 +356,30 @@ object Qibla {
         }, "Q")
         val sensorListener = object : SensorEventListener {
             private val rot = FloatArray(9)
-            private val ori = FloatArray(3)
+            private val grav = FloatArray(3)
+            private val geo = FloatArray(3)
+            private var haveGrav = false
+            private var haveGeo = false
             override fun onSensorChanged(e: SensorEvent) {
-                SensorManager.getRotationMatrixFromVector(rot, e.values)
-                SensorManager.getOrientation(rot, ori)
-                // Heading of the top of the screen: add the display rotation when the phone is held sideways.
-                @Suppress("DEPRECATION") val turn = activity.windowManager.defaultDisplay.rotation * 90
-                val raw = ((Math.toDegrees(ori[0].toDouble()) + turn + 360) % 360).toFloat()
+                when (e.sensor.type) {
+                    Sensor.TYPE_ROTATION_VECTOR -> SensorManager.getRotationMatrixFromVector(rot, e.values)
+                    Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_MAGNETIC_FIELD -> {
+                        val dst = if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) grav else geo
+                        val first = if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) !haveGrav else !haveGeo
+                        for (i in 0..2) dst[i] = if (first) e.values[i] else dst[i] + 0.15f * (e.values[i] - dst[i]) // low-pass
+                        if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) haveGrav = true else haveGeo = true
+                        if (sensor != null) return // fused sensor in use; the magnetometer only reports accuracy
+                        if (!haveGrav || !haveGeo || !SensorManager.getRotationMatrix(rot, null, grav, geo)) return
+                    }
+                    else -> return
+                }
+                // Direction the phone points: the top of the screen when it lies flat or tilted, the back of the
+                // phone when it is held upright (the top then points at the sky and gives no direction).
+                val yE = rot[1]; val yN = rot[4]; val zE = -rot[2]; val zN = -rot[5]
+                val upright = kotlin.math.hypot(yE, yN) < 0.5f
+                @Suppress("DEPRECATION") val turn = if (upright) 0 else activity.windowManager.defaultDisplay.rotation * 90
+                val deg = Math.toDegrees(if (upright) kotlin.math.atan2(zE.toDouble(), zN.toDouble()) else kotlin.math.atan2(yE.toDouble(), yN.toDouble()))
+                val raw = ((deg + turn + 720) % 360).toFloat()
                 rawHeading = if (rawHeading.isNaN()) raw else {
                     var d = raw - rawHeading
                     if (d > 180) d -= 360f
@@ -388,6 +411,9 @@ object Qibla {
                     else -> "↶ انعطف يساراً ${(-diff).roundToInt()}°"
                 }
                 hint.setTextColor(if (ok) Color.parseColor("#2E9E4F") else Color.parseColor("#E65100"))
+                // Numbers to compare with another app, and a nudge when the magnetometer needs calibrating.
+                hint.text = hint.text.toString() + "\nرأس الجوال يأشر على ${heading.roundToInt()}°" +
+                    if (magAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW) "\n⚠ البوصلة تحتاج معايرة: حرّك الجوال على شكل 8" else ""
                 web.evaluateJavascript("heading(${heading})", null)
                 if (tracking) {
                     web.evaluateJavascript("track($heading,$diff,$ok)", null)
@@ -397,10 +423,12 @@ object Qibla {
                     mapAligned = ok
                 }
             }
-            override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+            override fun onAccuracyChanged(s: Sensor?, a: Int) { if (s?.type == Sensor.TYPE_MAGNETIC_FIELD) magAccuracy = a }
         }
         if (sensor != null) sm.registerListener(sensorListener, sensor, SensorManager.SENSOR_DELAY_GAME)
-        else { big.text = "${qibla.roundToInt()}°"; hint.text = "جهازك بدون بوصلة — استخدم الخريطة" }
+        if (magnet != null) sm.registerListener(sensorListener, magnet, SensorManager.SENSOR_DELAY_GAME)
+        if (sensor == null && accel != null) sm.registerListener(sensorListener, accel, SensorManager.SENSOR_DELAY_GAME)
+        if (sensor == null && (accel == null || magnet == null)) { big.text = "${qibla.roundToInt()}°"; hint.text = "جهازك بدون بوصلة — استخدم الخريطة" }
 
         // ---- location ----
         val lm = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager

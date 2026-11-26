@@ -169,31 +169,37 @@ class MainActivity : Activity() {
         val sub = (if (today != null) "${CalendarData.weekday(today)} • ${today.zahra} ${CalendarData.MONTHS[today.month - 1]} ${CalendarData.ar(CalendarData.YEAR)}هـ" else "١٤٤٨هـ") + place
         titles.addView(ui.text(sub, 14f, Color.parseColor("#E6FFFFFF")).apply {
             setPadding(0, ui.dp(2), 0, 0)
+            maxLines = 1
+            setAutoSizeTextTypeUniformWithConfiguration(10, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(24))
             setOnClickListener { goToday() }
         })
         r1.addView(titles, ui.weight())
-        r1.addView(ui.text("اليوم", 14f, Color.parseColor("#2A1A00"), bold = true).apply {
-            setPadding(ui.dp(14), ui.dp(7), ui.dp(14), ui.dp(7))
-            background = ui.rounded(t.accent, 12)
-            setOnClickListener { goToday() }
-        }, ui.wrap(0, 0, 8, 0))
-        // 📍 Set my location: prayer times and the qibla follow where the phone is now.
-        r1.addView(ui.text("📍", 20f, Color.WHITE).apply {
+        // Header buttons: all 36dp, same spacing, same thin white style.
+        fun btnLp(last: Boolean = false) = LinearLayout.LayoutParams(ui.dp(36), ui.dp(36)).apply { if (!last) marginEnd = ui.dp(6) }
+        val btnBg = Color.parseColor("#26FFFFFF")
+        r1.addView(ui.text("اليوم", 13f, Color.parseColor("#2A1A00"), bold = true).apply {
             gravity = Gravity.CENTER
-            background = ui.rounded(if (LocationTimes.on(this@MainActivity)) t.accent else Color.parseColor("#33FFFFFF"), 12)
+            setPadding(ui.dp(11), 0, ui.dp(11), 0)
+            background = ui.rounded(t.accent, 11)
+            setOnClickListener { goToday() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(36)).apply { marginStart = ui.dp(6); marginEnd = ui.dp(6) })
+        // Set my location: prayer times and the qibla follow where the phone is now (gold tint when on).
+        r1.addView(LineIcon(this, LineIcon.Kind.GPS).apply {
+            background = ui.rounded(if (LocationTimes.on(this@MainActivity)) (t.accent and 0x00FFFFFF) or (0x80 shl 24) else btnBg, 11)
             contentDescription = "تحديد موقعي"
             setOnClickListener { setMyLocation() }
-        }, LinearLayout.LayoutParams(ui.dp(42), ui.dp(42)).apply { marginEnd = ui.dp(8) })
+        }, btnLp())
         r1.addView(KaabaButton(this, t.accent).apply {
-            background = ui.rounded(Color.parseColor("#33FFFFFF"), 12)
+            background = ui.rounded(btnBg, 11)
             contentDescription = "اتجاه القبلة"
             setOnClickListener { Qibla.show(this@MainActivity) }
-        }, LinearLayout.LayoutParams(ui.dp(42), ui.dp(42)).apply { marginEnd = ui.dp(8) })
-        r1.addView(ui.text("⚙", 24f, Color.WHITE, bold = true).apply {
-            gravity = Gravity.CENTER
-            background = ui.rounded(Color.parseColor("#33FFFFFF"), 12)
+        }, btnLp())
+        r1.addView(LineIcon(this, LineIcon.Kind.GEAR).apply {
+            background = ui.rounded(btnBg, 11)
+            contentDescription = "الإعدادات"
             setOnClickListener { settings() }
-        }, LinearLayout.LayoutParams(ui.dp(42), ui.dp(42)))
+        }, btnLp(last = true))
         box.addView(r1)
 
         val tabs = LinearLayout(this).apply {

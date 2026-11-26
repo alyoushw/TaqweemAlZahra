@@ -87,6 +87,18 @@ object Qibla {
     /** Degrees added to the phone's compass, measured against the satellite picture of the user's building. */
     fun calib(ctx: Context) = prefs(ctx).getFloat("qibla_calib", 0f)
     fun setCalib(ctx: Context, v: Float) = prefs(ctx).edit().putFloat("qibla_calib", v).apply()
+    /** The correction belongs to the building it was measured in: remember where, and use it only there. */
+    fun setCalibAt(ctx: Context, v: Float, lat: Double, lon: Double) =
+        prefs(ctx).edit().putFloat("qibla_calib", v).putFloat("qibla_calib_lat", lat.toFloat()).putFloat("qibla_calib_lon", lon.toFloat()).apply()
+    fun calibHere(ctx: Context, lat: Double, lon: Double): Float {
+        val c = calib(ctx)
+        if (c == 0f) return 0f
+        val p = prefs(ctx)
+        if (!p.contains("qibla_calib_lat")) return c
+        val d = FloatArray(1)
+        Location.distanceBetween(lat, lon, p.getFloat("qibla_calib_lat", 0f).toDouble(), p.getFloat("qibla_calib_lon", 0f).toDouble(), d)
+        return if (d[0] < 1000f) c else 0f
+    }
 
     fun chooseMapMode(activity: Activity, onChanged: () -> Unit = {}) {
         Dialogs.sheet(activity, "🗺", "نمط خريطة القبلة", "اختر طريقة استخدام خريطة الأقمار الصناعية") { col, dialog ->
@@ -309,6 +321,13 @@ object Qibla {
         val sm = activity.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: sm.getDefaultSensor(Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR)
         var aligned = false
+        var declination = 0f
+        fun updateDeclination() {
+            declination = runCatching {
+                android.hardware.GeomagneticField(lat.toFloat(), lon.toFloat(), 0f, System.currentTimeMillis()).declination
+            }.getOrDefault(0f)
+        }
+        updateDeclination()
         var mapAligned = false
         var rawHeading = Float.NaN
         val vibrator = activity.getSystemService(android.os.Vibrator::class.java)
@@ -317,10 +336,10 @@ object Qibla {
             @android.webkit.JavascriptInterface fun calibrated(mapBearing: Float) {
                 activity.runOnUiThread {
                     if (rawHeading.isNaN()) return@runOnUiThread
-                    var c = ((-mapBearing) - rawHeading) % 360f
+                    var c = ((-mapBearing) - rawHeading - declination) % 360f
                     if (c > 180) c -= 360f
                     if (c < -180) c += 360f
-                    setCalib(activity, c)
+                    setCalibAt(activity, c, lat, lon)
                     Toast.makeText(activity, "تم تصحيح البوصلة ${c.roundToInt()}°", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -340,7 +359,9 @@ object Qibla {
                     if (d < -180) d += 360f
                     (rawHeading + d * 0.2f + 360f) % 360f
                 }
-                val az = ((raw + calib(activity)) % 360f + 360f) % 360f
+                // The phone measures magnetic north; the qibla bearing is from true north: add the local declination
+                // (about 3° in the Gulf). Then the building correction, if it was made here.
+                val az = ((raw + declination + calibHere(activity, lat, lon)) % 360f + 360f) % 360f
                 heading = if (heading.isNaN()) az else {
                     var d = az - heading
                     if (d > 180) d -= 360f
@@ -393,6 +414,7 @@ object Qibla {
                 lat = l.latitude; lon = l.longitude; fromGps = true
                 lastFix = l
                 qibla = bearing(lat, lon)
+                updateDeclination()
                 refreshTexts()
                 pushToMap()
             }

@@ -218,9 +218,11 @@ object OpsCalendar {
                     "<style>body{margin:0;background:#fff}#p{position:relative}#p img{width:100%;display:block}" +
                     ".d{position:absolute;box-sizing:border-box;border-radius:3px}" +
                     ".d.sel{border:3px solid #D81B60;box-shadow:0 0 0 3px #F8BBD0aa,0 0 12px #D81B60;animation:b 1.2s ease-in-out 3}" +
-                    "@keyframes b{50%{box-shadow:0 0 0 6px #F8BBD0,0 0 18px #D81B60}}</style></head>" +
-                    "<body><div id='p'><img src='${y.image}' onload='go()'>$boxes</div>" +
-                    "<script>function go(){var e=document.querySelector('.sel');if(e&&$zoomIn)e.scrollIntoView({block:'center',inline:'center'});}</script></body></html>",
+                    "@keyframes b{50%{box-shadow:0 0 0 6px #F8BBD0,0 0 18px #D81B60}}</style>" +
+                    // Defined before the picture: a cached picture loads at once, and its onload must find go().
+                    "<script>function go(){var e=document.querySelector('.sel');if(e&&$zoomIn)e.scrollIntoView({block:'center',inline:'center'});}" +
+                    "window.addEventListener('load',function(){go();setTimeout(go,150);setTimeout(go,500);});</script></head>" +
+                    "<body><div id='p'><img src='${y.image}' onload='go()'>$boxes</div></body></html>",
                 "text/html", "utf-8", null)
         }
         ys.forEach { y ->
@@ -236,7 +238,9 @@ object OpsCalendar {
         show(ys.firstOrNull { it.year == (focus ?: LocalDate.now()).year } ?: ys.last())
         dialog.setContentView(root)
         Immersive.padBottom(root)
-        dialog.setOnDismissListener { web.destroy() }
+        dialog.setCancelable(true) // the phone's back button closes it like ✕
+        web.clearCache(false)
+        dialog.setOnDismissListener { runCatching { web.stopLoading(); web.destroy() } }
         dialog.showImmersive()
     }
 }
